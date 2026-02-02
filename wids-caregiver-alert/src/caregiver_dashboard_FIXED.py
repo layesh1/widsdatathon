@@ -27,6 +27,13 @@ try:
 except:
     EVACUATION_AVAILABLE = False
 
+# Import OSM routing (optional - requires network)
+try:
+    from osm_routing import get_real_driving_route, calculate_evacuation_route_osm
+    OSM_ROUTING_AVAILABLE = True
+except:
+    OSM_ROUTING_AVAILABLE = False
+
 # Page config
 st.set_page_config(
     page_title="Wildfire Caregiver Alert System",
@@ -414,6 +421,12 @@ if page == "🏠 Dashboard":
                     st.markdown("---")
                     st.subheader("🚗 Evacuation Routes")
                     
+                    # Show routing method
+                    if OSM_ROUTING_AVAILABLE:
+                        st.caption("🗺️ Using OpenStreetMap real road routing")
+                    else:
+                        st.caption("📏 Using estimated routes (straight-line + highways)")
+                    
                     try:
                         evac_plans = generate_evacuation_routes_for_alerts(
                             fire_data, vulnerable_populations, alerts[:5]
@@ -423,12 +436,43 @@ if page == "🏠 Dashboard":
                             urgency_color = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}
                             emoji = urgency_color.get(plan['urgency'], "⚪")
                             
+                            # Try OSM routing if available
+                            if OSM_ROUTING_AVAILABLE:
+                                try:
+                                    # Extract state from location
+                                    state = plan['location'].split(',')[-1].strip().split()[-1] if ',' in plan['location'] else None
+                                    
+                                    if state and len(state) == 2:
+                                        from osm_routing import get_best_evacuation_route
+                                        osm_route = get_best_evacuation_route(
+                                            plan.get('vulnerable_lat', 0),
+                                            plan.get('vulnerable_lon', 0),
+                                            plan.get('fire_lat', 0),
+                                            plan.get('fire_lon', 0),
+                                            state
+                                        )
+                                        
+                                        if osm_route and osm_route.get('success'):
+                                            plan['osm_distance'] = osm_route['distance_mi']
+                                            plan['osm_time'] = osm_route['drive_time_hours']
+                                            plan['route_type'] = 'REAL ROADS'
+                                except:
+                                    pass  # Fallback to estimates
+                            
                             # Handle None values safely
                             highway_dist = plan.get('highway_distance_mi')
                             highway_str = f"{highway_dist:.1f} mi" if highway_dist else "N/A"
                             
                             safe_zone_dist = plan.get('safe_zone_distance_mi')
                             safe_zone_str = f"{safe_zone_dist:.1f} mi" if safe_zone_dist else "N/A"
+                            
+                            # Use OSM data if available, otherwise estimates
+                            if plan.get('osm_distance'):
+                                distance_str = f"~{plan['osm_distance']:.0f} mi (real roads) 🗺️"
+                                time_str = f"~{plan['osm_time']:.1f} hours driving"
+                            else:
+                                distance_str = f"~{plan['total_distance_mi']:.0f} mi (estimated)"
+                                time_str = "(estimated route)"
                             
                             with st.expander(f"{emoji} {plan['location'][:25]}...", expanded=(plan['urgency']=='HIGH')):
                                 st.markdown(f"""
@@ -438,7 +482,8 @@ if page == "🏠 Dashboard":
                                 **🧭 Evacuate:** {plan['evacuation_direction']}  
                                 **🛣️ Highway:** {plan['nearest_highway']} ({highway_str})  
                                 **🏛️ Safe Zone:** {plan['safe_zone']} ({safe_zone_str})  
-                                **📏 Total:** ~{plan['total_distance_mi']:.0f} miles
+                                **📏 Total:** {distance_str}  
+                                {time_str}
                                 """)
                     except Exception as e:
                         st.error(f"Route calc error: {e}")
