@@ -24,6 +24,13 @@ except:
     CITY_DB_AVAILABLE = False
     US_CITIES = {}
 
+# Import dynamic safe-zones + city-specific transit
+try:
+    from transit_and_safezones import get_dynamic_safe_zones, get_transit_info
+    TRANSIT_DB_AVAILABLE = True
+except:
+    TRANSIT_DB_AVAILABLE = False
+
 
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     """
@@ -123,33 +130,8 @@ def get_route_with_traffic(origin_lat: float, origin_lon: float,
         return None
 
 
-def get_public_transit_options(origin_lat: float, origin_lon: float,
-                               dest_lat: float, dest_lon: float) -> List[Dict]:
-    """
-    Get public transit options
-    Note: This is a placeholder - real transit requires Transit API or GTFS data
-    """
-    
-    # For now, return placeholder info
-    # In production, integrate with:
-    # - Google Directions API (transit mode)
-    # - Transit app APIs
-    # - Local transit authority APIs
-    
-    return [
-        {
-            'type': 'Bus + Light Rail',
-            'estimated_time': '2-3 hours',
-            'status': 'Check local transit website for current service',
-            'note': 'Service may be disrupted during emergencies'
-        },
-        {
-            'type': 'Emergency Shuttle',
-            'estimated_time': 'Varies',
-            'status': 'Contact local emergency services',
-            'note': 'Dial 211 for evacuation assistance'
-        }
-    ]
+
+
 
 
 def render_evacuation_planner_page(fire_data, vulnerable_populations):
@@ -192,17 +174,11 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
         st.session_state.search_triggered = True
         st.session_state.search_address = address
     
-    # ==================== SAFE ZONES ====================
+    # ==================== DYNAMIC SAFE ZONES ====================
+    # Computed once per search, cached in session_state
     
-    safe_zones = {
-        'San Diego, CA': (32.7157, -117.1611),
-        'Phoenix, AZ': (33.4484, -112.0740),
-        'Las Vegas, NV': (36.1699, -115.1398),
-        'Sacramento, CA': (38.5816, -121.4944),
-        'Fresno, CA': (36.7378, -119.7871),
-        'Tucson, AZ': (32.2226, -110.9747),
-        'Albuquerque, NM': (35.0844, -106.6504),
-    }
+    if 'dynamic_safe_zones' not in st.session_state or search_button:
+        st.session_state.dynamic_safe_zones = None   # will fill after geocoding
     
     # ==================== ROUTE CALCULATION ====================
     
@@ -239,6 +215,19 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
         origin_lat, origin_lon = coords
         
         st.success(f"✅ Found location: {origin_lat:.4f}, {origin_lon:.4f}")
+        
+        # ---------- build dynamic safe-zone list (once per search) ----------
+        if st.session_state.dynamic_safe_zones is None or search_button:
+            with st.spinner("🗺️ Finding nearby safe zones…"):
+                st.session_state.dynamic_safe_zones = get_dynamic_safe_zones(
+                    origin_lat, origin_lon,
+                    fire_data=fire_data,
+                    min_distance_mi=40,
+                    max_distance_mi=600,
+                    num_zones=10
+                )
+        
+        safe_zone_list = st.session_state.dynamic_safe_zones   # list of dicts
         
         # Find nearest fires
         st.subheader("🔥 Nearby Fire Threats")
@@ -287,16 +276,37 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
         
         st.subheader("🛣️ Evacuation Routes")
         
-        # Destination selector
-        destination = st.selectbox(
-            "Select safe zone destination",
-            options=list(safe_zones.keys()),
-            help="Choose the nearest safe city outside fire zones"
-        )
+        # ---------- destination selector (dynamic) ----------
+        if safe_zone_list:
+            # Build labels: "City Name  —  42 mi  🚨 near fire" or just distance
+            zone_labels = []
+            for z in safe_zone_list:
+                fire_tag = "  🚨 fire nearby" if z['near_fire'] else ""
+                rail_tag = "  🚆" if z['has_rail'] else ""
+                zone_labels.append(f"{z['name']}  —  {z['distance_mi']} mi{rail_tag}{fire_tag}")
+            
+            # Keep the user's previous pick stable across reruns
+            if 'selected_zone_idx' not in st.session_state:
+                st.session_state.selected_zone_idx = 0
+            
+            selected_idx = st.selectbox(
+                "Select safe zone destination",
+                options=range(len(zone_labels)),
+                format_func=lambda i: zone_labels[i],
+                index=min(st.session_state.selected_zone_idx, len(zone_labels)-1),
+                help="Sorted by distance. 🚆 = has rail. 🚨 = fire detected nearby — avoid if possible.",
+                key="safe_zone_select"
+            )
+            st.session_state.selected_zone_idx = selected_idx
+            
+            selected_zone = safe_zone_list[selected_idx]
+            dest_lat, dest_lon = selected_zone['lat'], selected_zone['lon']
+            dest_name = selected_zone['name']
+        else:
+            st.warning("Could not find safe zones near you. Try a different city.")
+            return
         
-        dest_lat, dest_lon = safe_zones[destination]
-        
-        # Transportation mode
+        # Transportation mode checkboxes
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -308,25 +318,23 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
         
         st.markdown("---")
         
-        # Calculate routes
+        # ---------- calculate routes ----------
         routes = []
         
         if show_driving:
-            with st.spinner("Calculating driving route..."):
+            with st.spinner("Calculating driving route…"):
                 driving_route = get_route_with_traffic(origin_lat, origin_lon, dest_lat, dest_lon, 'driving')
                 if driving_route:
                     routes.append(('driving', driving_route))
         
         if show_walking:
-            with st.spinner("Calculating walking route..."):
+            with st.spinner("Calculating walking route…"):
                 walking_route = get_route_with_traffic(origin_lat, origin_lon, dest_lat, dest_lon, 'foot')
                 if walking_route:
                     routes.append(('walking', walking_route))
         
-        # Display routes
+        # ---------- route comparison table ----------
         if routes:
-            
-            # Route comparison table
             st.subheader("📊 Route Comparison")
             
             route_data = []
@@ -341,38 +349,71 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
             
             st.table(route_data)
             
-            # Detailed route info
+            # Detailed turn-by-turn
             for mode, route in routes:
-                
                 emoji = "🚗" if mode == "driving" else "🚶"
-                
                 with st.expander(f"{emoji} {mode.title()} Route Details", expanded=(mode=='driving')):
-                    
                     st.markdown(f"""
                     **Distance:** {route['distance_mi']:.1f} miles  
                     **Estimated Time:** {route['duration_hours']:.1f} hours ({route['duration_min']:.0f} minutes)  
-                    **Destination:** {destination}
+                    **Destination:** {dest_name}
                     """)
-                    
                     if route['steps']:
                         st.markdown("**Turn-by-Turn Directions:**")
                         for i, step in enumerate(route['steps'][:15], 1):
                             st.write(f"{i}. {step}")
-                        
                         if len(route['steps']) > 15:
-                            st.caption(f"... and {len(route['steps']) - 15} more steps")
+                            st.caption(f"… and {len(route['steps']) - 15} more steps")
         
-        # Public transit info
+        # ---------- PUBLIC TRANSIT — city-specific ----------
         if show_transit:
             st.subheader("🚌 Public Transit Options")
             
-            transit_options = get_public_transit_options(origin_lat, origin_lon, dest_lat, dest_lon)
+            # --- Origin city transit ---
+            origin_city_name = st.session_state.search_address
+            origin_transit = get_transit_info(origin_city_name) if TRANSIT_DB_AVAILABLE else None
             
-            for option in transit_options:
-                with st.expander(f"🚌 {option['type']}", expanded=False):
-                    st.write(f"**Estimated Time:** {option['estimated_time']}")
-                    st.write(f"**Status:** {option['status']}")
-                    st.info(option['note'])
+            if origin_transit:
+                with st.expander(f"🏙️ Transit in **{origin_city_name.strip().title()}** (your city)", expanded=True):
+                    # agencies
+                    st.markdown("**Transit Agencies:** " + ", ".join(origin_transit['agencies']))
+                    
+                    # rail lines
+                    if origin_transit['rail'] and origin_transit['rail_lines']:
+                        st.markdown("🚆 **Rail Lines:** " + " | ".join(origin_transit['rail_lines']))
+                    
+                    # bus
+                    if origin_transit['bus']:
+                        st.markdown("🚌 **Bus service:** Available")
+                    
+                    # notes
+                    st.info(origin_transit['notes'])
+                    
+                    # hotline + url
+                    st.markdown(f"📞 **Info line:** {origin_transit['emergency_hotline']}")
+                    if origin_transit.get('transit_url'):
+                        st.markdown(f"🌐 [Transit website]({origin_transit['transit_url']})")
+            
+            # --- Destination city transit ---
+            dest_transit = get_transit_info(selected_zone['name']) if TRANSIT_DB_AVAILABLE else None
+            
+            if dest_transit:
+                with st.expander(f"🏙️ Transit at **{selected_zone['name']}** (destination)", expanded=False):
+                    st.markdown("**Transit Agencies:** " + ", ".join(dest_transit['agencies']))
+                    if dest_transit['rail'] and dest_transit['rail_lines']:
+                        st.markdown("🚆 **Rail Lines:** " + " | ".join(dest_transit['rail_lines']))
+                    if dest_transit['bus']:
+                        st.markdown("🚌 **Bus service:** Available")
+                    st.info(dest_transit['notes'])
+                    st.markdown(f"📞 **Info line:** {dest_transit['emergency_hotline']}")
+                    if dest_transit.get('transit_url'):
+                        st.markdown(f"🌐 [Transit website]({dest_transit['transit_url']})")
+            
+            # --- Emergency shuttle (always shown) ---
+            with st.expander("🚐 Emergency Shuttle", expanded=False):
+                st.write("**Estimated Time:** Varies by location")
+                st.write("**Status:** Contact local emergency services")
+                st.info("Dial **211** for evacuation assistance in your area")
             
             st.warning("⚠️ Public transit may be limited during emergencies. Always have a backup plan.")
         
@@ -399,7 +440,7 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
         # Add destination marker
         folium.Marker(
             [dest_lat, dest_lon],
-            popup=destination,
+            popup=dest_name,
             icon=folium.Icon(color='blue', icon='flag-checkered', prefix='fa'),
             tooltip="Safe Zone"
         ).add_to(m)
