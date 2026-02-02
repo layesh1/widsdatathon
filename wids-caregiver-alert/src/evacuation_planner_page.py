@@ -16,20 +16,38 @@ import requests
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
+# Import comprehensive city database
+try:
+    from us_cities_database import US_CITIES, get_city_coordinates
+    CITY_DB_AVAILABLE = True
+except:
+    CITY_DB_AVAILABLE = False
+    US_CITIES = {}
+
 
 def geocode_address(address: str) -> Optional[Tuple[float, float]]:
     """
-    Convert address to lat/lon using Nominatim (OpenStreetMap) geocoding
-    Free, no API key needed!
+    Convert address to lat/lon
+    Uses comprehensive US cities database (500+ cities, all 50 states)
     """
     
+    address_lower = address.lower().strip()
+    
+    # Use city database first (works offline!)
+    if CITY_DB_AVAILABLE:
+        coords = get_city_coordinates(address_lower)
+        if coords:
+            st.info(f"📍 Found: {address}")
+            return coords
+    
+    # If city database didn't work, try external API
     url = "https://nominatim.openstreetmap.org/search"
     
     params = {
         'q': address,
         'format': 'json',
         'limit': 1,
-        'countrycodes': 'us'  # US only
+        'countrycodes': 'us'
     }
     
     headers = {
@@ -45,8 +63,7 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
         
         return None
         
-    except Exception as e:
-        st.error(f"Geocoding error: {e}")
+    except:
         return None
 
 
@@ -143,20 +160,37 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
     st.title("🚗 Personal Evacuation Planner")
     st.markdown("Get personalized evacuation routes with real-time traffic and transit info")
     
+    # Initialize session state
+    if 'search_address' not in st.session_state:
+        st.session_state.search_address = None
+    if 'search_coords' not in st.session_state:
+        st.session_state.search_coords = None
+    if 'search_triggered' not in st.session_state:
+        st.session_state.search_triggered = False
+    
     # ==================== ADDRESS INPUT ====================
     st.subheader("📍 Your Location")
+    
+    st.info("💡 **Supports 500+ US cities in all 50 states!** Just type your city name (e.g., 'Charlotte, NC' or 'Miami')")
     
     col1, col2 = st.columns([3, 1])
     
     with col1:
         address = st.text_input(
-            "Enter your address",
-            placeholder="123 Main St, Los Angeles, CA 90012",
-            help="Enter your full address including city and state"
+            "Enter your city",
+            value=st.session_state.search_address if st.session_state.search_address else "",
+            placeholder="Enter any US city (e.g., Charlotte, Miami, Denver)",
+            help="Works with ANY major US city - all 50 states supported!",
+            key="address_input"
         )
     
     with col2:
         search_button = st.button("🔍 Find Route", type="primary")
+    
+    # Update search trigger
+    if search_button and address:
+        st.session_state.search_triggered = True
+        st.session_state.search_address = address
     
     # ==================== SAFE ZONES ====================
     
@@ -172,14 +206,34 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
     
     # ==================== ROUTE CALCULATION ====================
     
-    if search_button and address:
+    if st.session_state.search_triggered and st.session_state.search_address:
         
-        with st.spinner("🗺️ Geocoding your address..."):
-            coords = geocode_address(address)
+        # Geocode only if new search or no cached coords
+        if st.session_state.search_coords is None or search_button:
+            with st.spinner("🗺️ Finding your location..."):
+                coords = geocode_address(st.session_state.search_address)
+            
+            if coords:
+                st.session_state.search_coords = coords
+            else:
+                st.session_state.search_coords = None
+        
+        coords = st.session_state.search_coords
         
         if coords is None:
-            st.error("❌ Could not find address. Please check spelling and try again.")
-            st.info("💡 Try: '1600 Pennsylvania Ave, Washington DC' or 'Times Square, New York'")
+            st.error("❌ City not found. Please check spelling and try again.")
+            st.info("""
+            **Supported:** ALL major US cities in 50 states + DC  
+            
+            **Examples that work:**
+            - Charlotte, NC • Miami, FL • Denver, CO
+            - New York • Chicago • Houston • Phoenix
+            - Seattle • Portland • Atlanta • Nashville
+            - Austin • Dallas • Minneapolis • Detroit
+            - And 400+ more cities!
+            
+            💡 **Tip:** Try just the city name or add the state abbreviation
+            """)
             return
         
         origin_lat, origin_lon = coords
@@ -419,7 +473,16 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
     
     else:
         # Initial state - show instructions
-        st.info("👆 Enter your address above to get personalized evacuation routes")
+        
+        # Add clear button if there are cached results
+        if st.session_state.search_triggered:
+            if st.button("🔄 Clear and Start New Search"):
+                st.session_state.search_address = None
+                st.session_state.search_coords = None
+                st.session_state.search_triggered = False
+                st.rerun()
+        
+        st.info("👆 Enter your city above to get personalized evacuation routes")
         
         st.markdown("---")
         
