@@ -143,7 +143,66 @@ STATE_DOT_LINKS: Dict[str, Dict[str, str]] = {
     "WY":{"name":"Wyoming",         "url":"https://www.wyoming.gov/dot/"},
 }
 
-# Colours for each route segment type
+# ── Major intercity-bus terminals (Greyhound / FlixBus / Megabus) ────
+# Static seed so the page always has intercity options even if Overpass
+# returns nothing.  Each entry: (city_display, lat, lon, carriers, address)
+INTERCITY_TERMINALS: List[Dict] = [
+    # Southeast
+    {"city":"Charlotte, NC",        "lat":35.2272, "lon":-80.8431, "carriers":["Greyhound","FlixBus"],        "address":"601 E Trade St"},
+    {"city":"Raleigh, NC",          "lat":35.7721, "lon":-78.6386, "carriers":["Greyhound","FlixBus"],        "address":"316 W Jones St"},
+    {"city":"Atlanta, GA",          "lat":33.7490, "lon":-84.3880, "carriers":["Greyhound","FlixBus"],        "address":"227 Peachtree St NE"},
+    {"city":"Miami, FL",            "lat":25.7617, "lon":-80.1918, "carriers":["Greyhound","FlixBus"],        "address":"3801 NW 7th St"},
+    {"city":"Orlando, FL",          "lat":28.5383, "lon":-81.3792, "carriers":["Greyhound","FlixBus"],        "address":"1717 S Orange Blossom Trail"},
+    {"city":"Nashville, TN",        "lat":36.1627, "lon":-86.7816, "carriers":["Greyhound","FlixBus"],        "address":"200 S 11th Ave"},
+    {"city":"New Orleans, LA",      "lat":29.9511, "lon":-90.0715, "carriers":["Greyhound","FlixBus"],        "address":"1522 Tulane Ave"},
+    {"city":"Birmingham, AL",       "lat":33.5206, "lon":-86.8024, "carriers":["Greyhound"],                  "address":"2100 11th Ave N"},
+    # Northeast
+    {"city":"New York, NY",         "lat":40.7580, "lon":-73.9855, "carriers":["Greyhound","FlixBus","Megabus"], "address":"Port Authority Bus Terminal, 42nd St"},
+    {"city":"Washington, DC",       "lat":38.8951, "lon":-77.0369, "carriers":["Greyhound","FlixBus","Megabus"], "address":"1200 1st Ave NE"},
+    {"city":"Philadelphia, PA",     "lat":39.9526, "lon":-75.1652, "carriers":["Greyhound","FlixBus","Megabus"], "address":"1100 Market St"},
+    {"city":"Boston, MA",           "lat":42.3601, "lon":-71.0589, "carriers":["Greyhound","FlixBus","Megabus"], "address":"South Station"},
+    {"city":"Baltimore, MD",        "lat":39.2904, "lon":-76.6122, "carriers":["Greyhound","FlixBus"],        "address":"2400 W Baltimore St"},
+    {"city":"Pittsburgh, PA",       "lat":40.4406, "lon":-79.9959, "carriers":["Greyhound","FlixBus"],        "address":"2702 Liberty Ave"},
+    # Midwest
+    {"city":"Chicago, IL",          "lat":41.8781, "lon":-87.6298, "carriers":["Greyhound","FlixBus","Megabus"], "address":"141 W Jackson Blvd"},
+    {"city":"Detroit, MI",          "lat":42.3314, "lon":-83.0458, "carriers":["Greyhound","FlixBus"],        "address":"1200 Howard St"},
+    {"city":"Cleveland, OH",        "lat":41.4993, "lon":-81.6944, "carriers":["Greyhound","FlixBus"],        "address":"2828 Ontario St"},
+    {"city":"Indianapolis, IN",     "lat":39.7684, "lon":-86.1581, "carriers":["Greyhound","FlixBus"],        "address":"350 E Washington St"},
+    {"city":"Minneapolis, MN",      "lat":44.9778, "lon":-93.2650, "carriers":["Greyhound","FlixBus"],        "address":"24 E Hennepin Ave"},
+    {"city":"St. Louis, MO",        "lat":38.6270, "lon":-90.1994, "carriers":["Greyhound","FlixBus"],        "address":"892 St. Ferdinand St"},
+    {"city":"Milwaukee, WI",        "lat":43.0389, "lon":-87.9065, "carriers":["Greyhound","FlixBus"],        "address":"105 N 6th St"},
+    # South / Southwest
+    {"city":"Dallas, TX",           "lat":32.7767, "lon":-96.7970, "carriers":["Greyhound","FlixBus"],        "address":"8525 Stemmons Fwy"},
+    {"city":"Houston, TX",          "lat":29.7604, "lon":-95.3698, "carriers":["Greyhound","FlixBus"],        "address":"2041 Polk St"},
+    {"city":"San Antonio, TX",      "lat":29.4241, "lon":-98.4936, "carriers":["Greyhound","FlixBus"],        "address":"127 Concepcion St"},
+    {"city":"Austin, TX",           "lat":30.2672, "lon":-97.7431, "carriers":["Greyhound","FlixBus"],        "address":"916 W 6th St"},
+    {"city":"Phoenix, AZ",          "lat":33.4484, "lon":-112.0740,"carriers":["Greyhound","FlixBus"],        "address":"2121 W Indian School Rd"},
+    {"city":"Albuquerque, NM",      "lat":35.0844, "lon":-106.6504,"carriers":["Greyhound"],                  "address":"201 E Tijeras Ave"},
+    {"city":"Oklahoma City, OK",    "lat":35.4676, "lon":-97.5164, "carriers":["Greyhound","FlixBus"],        "address":"712 SW 8th St"},
+    # West
+    {"city":"Los Angeles, CA",      "lat":34.0522, "lon":-118.2437,"carriers":["Greyhound","FlixBus","Megabus"], "address":"1716 E 7th St"},
+    {"city":"San Francisco, CA",    "lat":37.7749, "lon":-122.4194,"carriers":["Greyhound","FlixBus","Megabus"], "address":"200 Folsom St"},
+    {"city":"San Diego, CA",        "lat":32.7157, "lon":-117.1611,"carriers":["Greyhound","FlixBus"],        "address":"120 W Broadway"},
+    {"city":"Sacramento, CA",       "lat":38.5816, "lon":-121.4944,"carriers":["Greyhound","FlixBus"],        "address":"801 L St"},
+    {"city":"Seattle, WA",          "lat":47.6062, "lon":-122.3321,"carriers":["Greyhound","FlixBus"],        "address":"611 2nd Ave"},
+    {"city":"Portland, OR",         "lat":45.5152, "lon":-122.6784,"carriers":["Greyhound","FlixBus"],        "address":"550 NW Broadway"},
+    {"city":"Denver, CO",           "lat":39.7392, "lon":-104.9903,"carriers":["Greyhound","FlixBus"],        "address":"1700 E Colfax Ave"},
+    {"city":"Salt Lake City, UT",   "lat":40.7608, "lon":-111.8910,"carriers":["Greyhound","FlixBus"],        "address":"300 S 400 W"},
+    {"city":"Las Vegas, NV",        "lat":36.1699, "lon":-115.1398,"carriers":["Greyhound","FlixBus"],        "address":"5100 S Decatur Blvd"},
+    {"city":"Boise, ID",            "lat":43.6150, "lon":-116.2023,"carriers":["Greyhound"],                  "address":"501 S Main St"},
+    # Hawaii / Alaska (limited)
+    {"city":"Honolulu, HI",         "lat":21.3069, "lon":-157.8583,"carriers":["TheHawaiiBus"],               "address":"Ala Moana Center"},
+    {"city":"Anchorage, AK",        "lat":61.2181, "lon":-149.9003,"carriers":["Greyhound"],                  "address":"321 E 5th Ave"},
+]
+
+
+def _nearest_intercity_terminals(lat, lon, terminals: List[Dict], n: int = 5) -> List[Dict]:
+    """Return the n closest intercity terminals to (lat, lon), with distance added."""
+    out = []
+    for t in terminals:
+        d = _haversine(lat, lon, t["lat"], t["lon"])
+        out.append({**t, "dist_mi": round(d, 1)})
+    return sorted(out, key=lambda x: x["dist_mi"])[:n]
 MODE_COLOURS = {
     "car":       "#2563eb",   # blue
     "foot":      "#16a34a",   # green
@@ -283,8 +342,12 @@ def fetch_transit_stops(lat: float, lon: float, radius_m: int = 8000) -> List[Di
       node["railway"~"station|halt|tram_stop"](around:{radius_m},{lat},{lon});
       node["amenity"="bus_station"](around:{radius_m},{lat},{lon});
       node["public_transport"~"stop|station|platform"](around:{radius_m},{lat},{lon});
+      node["amenity"="bus_station"]["operator"~"[Gg]reyhound|[Ff]lix[Bb]us|[Mm]ega[Bb]us"](around:{radius_m},{lat},{lon});
+      node["route"~"bus|coach"](around:{radius_m},{lat},{lon});
+      way["amenity"="bus_station"](around:{radius_m},{lat},{lon});
+      way["public_transport"="station"](around:{radius_m},{lat},{lon});
     );
-    out;
+    out center;
     """
     for ep in OVERPASS_ENDPOINTS:
         try:
@@ -297,17 +360,22 @@ def fetch_transit_stops(lat: float, lon: float, radius_m: int = 8000) -> List[Di
             if r.status_code != 200:
                 continue
             raw = r.json()
-            stops, seen = [], set()
             for elem in raw.get("elements", []):
                 tags = elem.get("tags", {})
                 name = tags.get("name", "").strip()
                 if not name or name in seen:
                     continue
                 seen.add(name)
-                slat, slon = elem.get("lat"), elem.get("lon")
+                slat = elem.get("lat") or (elem.get("center") or {}).get("lat")
+                slon = elem.get("lon") or (elem.get("center") or {}).get("lon")
                 if slat is None or slon is None:
                     continue
-                if tags.get("railway") in ("station", "halt"):
+                # Detect intercity coach first (most specific)
+                op = (tags.get("operator") or "").lower()
+                is_intercity = any(k in op for k in ("greyhound", "flixbus", "megabus", "coach"))
+                if is_intercity or tags.get("route") == "coach":
+                    stype = "Intercity Coach"
+                elif tags.get("railway") in ("station", "halt"):
                     stype = "Rail"
                 elif tags.get("railway") == "tram_stop":
                     stype = "Tram"
@@ -697,7 +765,8 @@ def build_map(olat, olon, dlat, dlon,
               car_route, foot_route, transit_itin, combined_itin,
               active_mode, route_fires, incidents,
               origin_stops, dest_stops,
-              origin_label, dest_label) -> folium.Map:
+              origin_label, dest_label,
+              intercity_terminals=None) -> folium.Map:
 
     mid_lat, mid_lon = (olat + dlat) / 2, (olon + dlon) / 2
     dist_mi = _haversine(olat, olon, dlat, dlon)
@@ -761,6 +830,24 @@ def build_map(olat, olon, dlat, dlon,
             tooltip=f"{stop['type']}: {stop['name']}",
         ).add_to(m)
 
+    # ── Intercity-bus terminal pins (teal diamonds) ──
+    for t in (intercity_terminals or []):
+        carriers = ", ".join(t.get("carriers", []))
+        folium.Marker(
+            [t["lat"], t["lon"]],
+            icon=folium.DivIcon(
+                html=f'<div style="font-size:18px;color:#0d9488;text-shadow:0 0 3px #fff;">'
+                     f'◆</div>',
+                icon_size=(20, 20), icon_anchor=(10, 10),
+            ),
+            popup=(f"<b>{t['city']}</b><br>"
+                   f"<i>Intercity Coach</i><br>"
+                   f"{carriers}<br>"
+                   f"{t.get('address','')}<br>"
+                   f"{t['dist_mi']} mi away"),
+            tooltip=f"Coach: {t['city']} ({carriers})",
+        ).add_to(m)
+
     # ── Fire circles ──
     for f in route_fires:
         acres = f.get("acres", 100) or 100
@@ -799,6 +886,7 @@ def build_map(olat, olon, dlat, dlon,
      <span style="color:#9333ea;font-size:18px;">━━</span> Transit Ride<br><br>
      <span style="color:red;font-size:16px;">●</span> Fire Zone &nbsp;&nbsp;
      <span style="color:#7c3aed;font-size:14px;">●</span> Transit Stop &nbsp;&nbsp;
+     <span style="color:#0d9488;font-size:14px;">◆</span> Intercity Coach &nbsp;&nbsp;
      <span style="color:orange;font-size:14px;">▲</span> Road Incident
     </div>"""
     m.get_root().html.add_child(folium.Element(legend_html))
@@ -900,6 +988,19 @@ def render_directions_page(fire_data, vulnerable_populations):
     origin_stops = st.session_state.dir_origin_stops or []
     dest_stops   = st.session_state.dir_dest_stops or []
 
+    # ── Nearest intercity-bus terminals (static seed + any OSM coach stops) ──
+    nearby_intercity = _nearest_intercity_terminals(olat, olon, INTERCITY_TERMINALS, n=5)
+    # Also pull any Overpass-discovered intercity stops into the list
+    for s in origin_stops:
+        if s["type"] == "Intercity Coach" and not any(
+                t["city"].lower().startswith(s["name"].lower()[:8]) for t in nearby_intercity):
+            nearby_intercity.append({
+                "city": s["name"], "lat": s["lat"], "lon": s["lon"],
+                "carriers": [s.get("operator", "Coach")],
+                "address": "", "dist_mi": round(_haversine(olat, olon, s["lat"], s["lon"]), 1),
+            })
+    nearby_intercity = sorted(nearby_intercity, key=lambda x: x["dist_mi"])[:6]
+
     # ── Compute all routes ──
     with st.spinner("Calculating routes…"):
         car_route     = osrm_route(olat, olon, dlat, dlon, "car")
@@ -981,8 +1082,7 @@ def render_directions_page(fire_data, vulnerable_populations):
         tab_labels.append(f"Transit  ({_fmt(transit_itin['total_min'])})")
     if combined_itin:
         tab_labels.append(f"Combined  ({_fmt(combined_itin['total_min'])})")
-
-    tabs = st.tabs(tab_labels)
+    tab_labels.append("Intercity Bus")
     active_mode = "driving"
 
     # ── TAB: DRIVING ──
@@ -1066,6 +1166,48 @@ def render_directions_page(fire_data, vulnerable_populations):
             for i, step in enumerate(combined_itin["steps"], 1):
                 st.write(f"{i}. {step}")
             st.info("Drive to the transit hub, park, board, ride to near your destination, then walk.")
+            tidx += 1
+
+    # ── TAB: INTERCITY BUS ──
+    if tidx < len(tabs):
+        with tabs[tidx]:
+            st.subheader("Intercity Bus Options")
+            st.caption(
+                "Greyhound, FlixBus, and Megabus terminals near your origin. "
+                "Book tickets directly on each carrier's site or app before departing."
+            )
+
+            if nearby_intercity:
+                for t in nearby_intercity:
+                    carriers = ", ".join(t.get("carriers", []))
+                    addr     = t.get("address", "")
+                    dist     = t.get("dist_mi", "?")
+                    st.markdown(
+                        f"**{t['city']}** — {dist} mi away\n"
+                        f"Carriers: {carriers}\n"
+                        f"Address: {addr}"
+                    )
+                    # Booking links
+                    links = []
+                    for c in t.get("carriers", []):
+                        cl = c.lower()
+                        if "greyhound" in cl:
+                            links.append("[Greyhound](https://www.greyhoundlines.com/en-us/)")
+                        elif "flixbus" in cl:
+                            links.append("[FlixBus](https://www.flixbus.com/)")
+                        elif "megabus" in cl:
+                            links.append("[Megabus](https://us.megabus.com/)")
+                    if links:
+                        st.caption("Book:  " + "  •  ".join(links))
+                    st.markdown("---")
+            else:
+                st.info("No intercity terminals found near your origin. Check greyhoundlines.com or flixbus.com directly.")
+
+            st.warning(
+                "Schedules and availability are not shown here — always confirm departure times "
+                "on the carrier's website or app before heading to the terminal. "
+                "Service may be limited or suspended during active wildfire emergencies."
+            )
 
     # ── COMPARISON TABLE ──
     st.markdown("---")
@@ -1084,12 +1226,16 @@ def render_directions_page(fire_data, vulnerable_populations):
         rows.append({"Mode": "Combined", "Distance": f"{combined_itin['total_dist_mi']} mi",
                      "ETA": _fmt(combined_itin["total_min"]),
                      "Notes": f"Drive → {combined_itin['hub']['name']} → ride → {combined_itin['dest_stop']['name']} → walk."})
+    if nearby_intercity:
+        rows.append({"Mode": "Intercity Bus", "Distance": f"{nearby_intercity[0]['dist_mi']} mi to terminal",
+                     "ETA": "Varies by schedule",
+                     "Notes": f"Nearest: {nearby_intercity[0]['city']} ({', '.join(nearby_intercity[0]['carriers'])}). Book online."})
     st.table(rows)
 
     # ── INTERACTIVE MAP ──
     st.markdown("---")
     st.subheader("Route Map")
-    st.caption("Active route is bold; faint lines = other available modes. Red/orange = fire zones. Purple dots = transit stops.")
+    st.caption("Active route is bold; faint lines = other available modes. Red/orange = fire zones. Purple dots = transit stops. Teal diamonds = intercity coach terminals.")
 
     m = build_map(
         olat, olon, dlat, dlon,
@@ -1101,6 +1247,7 @@ def render_directions_page(fire_data, vulnerable_populations):
         dest_stops=dest_stops,
         origin_label=st.session_state.dir_origin.title(),
         dest_label=st.session_state.dir_dest.title(),
+        intercity_terminals=nearby_intercity,
     )
     st_folium(m, width="100%", height=650)
 
