@@ -206,19 +206,23 @@ def _nearest_intercity_terminals(lat, lon, terminals: List[Dict], n: int = 5) ->
 MODE_COLOURS = {
     "car":       "#2563eb",   # blue
     "foot":      "#16a34a",   # green
+    "walk":      "#16a34a",   # green
     "walk_to":   "#16a34a",   # green
     "walk_from": "#16a34a",   # green
     "ride":      "#9333ea",   # purple
     "drive":     "#2563eb",   # blue
+    "coach":     "#0d9488",   # teal
 }
 
 MODE_DASH = {
     "car":       None,
     "foot":      "8 4",
+    "walk":      "8 4",
     "walk_to":   "8 4",
     "walk_from": "8 4",
     "ride":      None,
     "drive":     None,
+    "coach":     "12 6",
 }
 
 
@@ -407,108 +411,289 @@ def _nearest_stop(lat, lon, stops: List[Dict]) -> Optional[Dict]:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# TRANSIT ITINERARY  (walk → ride → walk)
+# MULTIMODAL ROUTE OPTIONS  (Google Maps-style: multiple ranked plans)
 # ══════════════════════════════════════════════════════════════════════
+# Each "plan" is a list of legs.  Each leg: {mode, label, duration_min,
+# dist_mi, geometry, stop_name}.  Plans are ranked and labelled
+# (Fastest, Fewest Transfers, Most Walking, etc.).
 
-def build_transit_itinerary(olat, olon, dlat, dlon,
-                            origin_stops, dest_stops) -> Optional[Dict]:
-    if not origin_stops or not dest_stops:
-        return None
-    o_stop = _nearest_stop(olat, olon, origin_stops)
-    d_stop = _nearest_stop(dlat, dlon, dest_stops)
-    if not o_stop or not d_stop:
-        return None
+_WALK_SPEED_MPH = 3.2
+_BUS_SPEED_MPH  = 22.0
+_RAIL_SPEED_MPH = 40.0
+_CAR_SPEED_MPH  = 35.0   # urban average
+_BOARD_BUF_MIN  = 5      # boarding buffer per transfer
 
-    walk_to   = osrm_route(olat, olon, o_stop["lat"], o_stop["lon"], "foot")
-    ride_geom = osrm_route(o_stop["lat"], o_stop["lon"], d_stop["lat"], d_stop["lon"], "car")
-    walk_from = osrm_route(d_stop["lat"], d_stop["lon"], dlat, dlon, "foot")
-
-    ride_dist_mi = _haversine(o_stop["lat"], o_stop["lon"], d_stop["lat"], d_stop["lon"])
-    ride_min     = round(ride_dist_mi / 25 * 60, 1)
-
-    wt_min = walk_to["duration_min"]   if walk_to   else round(_haversine(olat, olon, o_stop["lat"], o_stop["lon"]) / 3 * 60, 1)
-    wf_min = walk_from["duration_min"] if walk_from else round(_haversine(d_stop["lat"], d_stop["lon"], dlat, dlon) / 3 * 60, 1)
-
-    board_buf  = 5
-    total_min  = round(wt_min + board_buf + ride_min + wf_min, 1)
-
-    steps = [
-        f"Walk to {o_stop['name']} ({o_stop['type']}) — {wt_min:.0f} min",
-        f"Board {o_stop['type']} at {o_stop['name']} (allow ~{board_buf} min)",
-        f"Ride to {d_stop['name']} — {ride_min:.0f} min ({ride_dist_mi:.1f} mi)",
-        f"Walk from {d_stop['name']} to destination — {wf_min:.0f} min",
-    ]
-
-    legs = []
-    if walk_to:
-        legs.append({"mode": "walk_to",   "geometry": walk_to["geometry"],   "label": f"Walk → {o_stop['name']}"})
-    legs.append(    {"mode": "ride",       "geometry": ride_geom["geometry"] if ride_geom else [], "label": f"Ride {o_stop['type']}"})
-    if walk_from:
-        legs.append({"mode": "walk_from", "geometry": walk_from["geometry"], "label": "Walk → Destination"})
-
-    return {
-        "legs": legs, "total_min": total_min,
-        "total_dist_mi": round(_haversine(olat, olon, dlat, dlon), 1),
-        "origin_stop": o_stop, "dest_stop": d_stop, "steps": steps,
-    }
+def _leg(mode: str, label: str, dur: float, dist: float, geom: list, stop: str = "") -> Dict:
+    return {"mode": mode, "label": label, "duration_min": round(dur, 1),
+            "dist_mi": round(dist, 2), "geometry": geom, "stop": stop}
 
 
-# ══════════════════════════════════════════════════════════════════════
-# COMBINED ITINERARY  (drive → transit hub → ride → walk)
-# ══════════════════════════════════════════════════════════════════════
+def _dur_from_route(r, fallback_dist_mi, speed_mph):
+    if r and r.get("duration_min"):
+        return r["duration_min"]
+    return round(fallback_dist_mi / speed_mph * 60, 1)
 
-def build_combined_itinerary(olat, olon, dlat, dlon,
-                             origin_stops, dest_stops) -> Optional[Dict]:
-    if not origin_stops or not dest_stops:
-        return None
 
-    # Prefer Rail > Bus Station > Tram > Bus for hub
-    hub = None
-    for ptype in ("Rail", "Bus Station", "Tram", "Bus"):
-        typed = [s for s in origin_stops if s["type"] == ptype]
-        if typed:
-            hub = _nearest_stop(olat, olon, typed)
-            break
-    if hub is None:
-        hub = _nearest_stop(olat, olon, origin_stops)
-    if hub is None:
-        return None
+def build_multimodal_options(olat, olon, dlat, dlon,
+                             origin_stops, dest_stops,
+                             nearby_intercity) -> List[Dict]:
+    """
+    Returns a list of plan dicts, each with:
+        label   – e.g. "Fastest", "Fewest Transfers"
+        tag     – short badge text
+        legs    – ordered list of leg dicts
+        total_min
+        total_dist_mi
+        transfers – number of mode-switches
+    """
+    plans: List[Dict] = []
+    o_all = origin_stops or []
+    d_all = dest_stops   or []
+    straight = _haversine(olat, olon, dlat, dlon)
 
-    d_stop = _nearest_stop(dlat, dlon, dest_stops)
-    if d_stop is None:
-        return None
+    # helpers to find stops by type
+    def _by_type(stops, *types):
+        return [s for s in stops if s["type"] in types]
 
-    drive_leg = osrm_route(olat, olon, hub["lat"], hub["lon"], "car")
-    ride_geom = osrm_route(hub["lat"], hub["lon"], d_stop["lat"], d_stop["lon"], "car")
-    walk_leg  = osrm_route(d_stop["lat"], d_stop["lon"], dlat, dlon, "foot")
+    def _near(lat, lon, stops):
+        return _nearest_stop(lat, lon, stops) if stops else None
 
-    drive_min = drive_leg["duration_min"] if drive_leg else round(_haversine(olat, olon, hub["lat"], hub["lon"]) / 30 * 60, 1)
-    ride_dist = _haversine(hub["lat"], hub["lon"], d_stop["lat"], d_stop["lon"])
-    ride_min  = round(ride_dist / 25 * 60, 1)
-    walk_min  = walk_leg["duration_min"] if walk_leg else round(_haversine(d_stop["lat"], d_stop["lon"], dlat, dlon) / 3 * 60, 1)
+    # ── PLAN A: Pure walk ──────────────────────────────────────────
+    walk_r = osrm_route(olat, olon, dlat, dlon, "foot")
+    walk_dur = _dur_from_route(walk_r, straight * 1.2, _WALK_SPEED_MPH)
+    plans.append({
+        "label": "Walk",
+        "tag":   "All walking",
+        "legs":  [_leg("walk", "Walk to destination", walk_dur, straight * 1.2,
+                       walk_r["geometry"] if walk_r else [], "")],
+        "total_min": walk_dur,
+        "total_dist_mi": round(straight * 1.2, 1),
+        "transfers": 0,
+    })
 
-    board_buf  = 5
-    total_min  = round(drive_min + board_buf + ride_min + walk_min, 1)
+    # ── PLAN B: Pure drive ─────────────────────────────────────────
+    car_r = osrm_route(olat, olon, dlat, dlon, "car")
+    car_dur  = _dur_from_route(car_r, straight * 1.3, _CAR_SPEED_MPH)
+    car_dist = car_r["distance_mi"] if car_r else round(straight * 1.3, 1)
+    plans.append({
+        "label": "Drive",
+        "tag":   "All driving",
+        "legs":  [_leg("car", "Drive to destination", car_dur, car_dist,
+                       car_r["geometry"] if car_r else [], "")],
+        "total_min": car_dur,
+        "total_dist_mi": round(car_dist, 1),
+        "transfers": 0,
+    })
 
-    steps = [
-        f"Drive to {hub['name']} ({hub['type']}) — {drive_min:.0f} min",
-        f"Park & board {hub['type']} (allow ~{board_buf} min)",
-        f"Ride to {d_stop['name']} — {ride_min:.0f} min ({ride_dist:.1f} mi)",
-        f"Walk from {d_stop['name']} to destination — {walk_min:.0f} min",
-    ]
+    # ── helper: build a walk→ride→walk plan given an origin & dest stop ──
+    def _walk_ride_walk(o_stop, d_stop, ride_speed, ride_label_prefix) -> Optional[Dict]:
+        if not o_stop or not d_stop:
+            return None
+        w1_r  = osrm_route(olat, olon, o_stop["lat"], o_stop["lon"], "foot")
+        ride_r = osrm_route(o_stop["lat"], o_stop["lon"], d_stop["lat"], d_stop["lon"], "car")
+        w2_r  = osrm_route(d_stop["lat"], d_stop["lon"], dlat, dlon, "foot")
 
-    legs = []
-    if drive_leg:
-        legs.append({"mode": "drive",     "geometry": drive_leg["geometry"], "label": f"Drive → {hub['name']}"})
-    legs.append(    {"mode": "ride",       "geometry": ride_geom["geometry"] if ride_geom else [], "label": f"Ride {hub['type']}"})
-    if walk_leg:
-        legs.append({"mode": "walk_from", "geometry": walk_leg["geometry"],  "label": "Walk → Destination"})
+        d_w1   = _haversine(olat, olon, o_stop["lat"], o_stop["lon"])
+        d_ride = _haversine(o_stop["lat"], o_stop["lon"], d_stop["lat"], d_stop["lon"])
+        d_w2   = _haversine(d_stop["lat"], d_stop["lon"], dlat, dlon)
 
-    return {
-        "legs": legs, "total_min": total_min,
-        "total_dist_mi": round(_haversine(olat, olon, dlat, dlon), 1),
-        "hub": hub, "dest_stop": d_stop, "steps": steps,
-    }
+        t_w1   = _dur_from_route(w1_r, d_w1, _WALK_SPEED_MPH)
+        t_ride = round(d_ride / ride_speed * 60, 1)
+        t_w2   = _dur_from_route(w2_r, d_w2, _WALK_SPEED_MPH)
+        total  = round(t_w1 + _BOARD_BUF_MIN + t_ride + t_w2, 1)
+
+        legs = []
+        if t_w1 > 0.5:
+            legs.append(_leg("walk", f"Walk to {o_stop['name']}", t_w1, d_w1,
+                             w1_r["geometry"] if w1_r else [], o_stop["name"]))
+        legs.append(_leg("ride", f"{ride_label_prefix} {o_stop['name']} → {d_stop['name']}",
+                         t_ride + _BOARD_BUF_MIN, d_ride,
+                         ride_r["geometry"] if ride_r else [], o_stop["name"]))
+        if t_w2 > 0.5:
+            legs.append(_leg("walk", f"Walk from {d_stop['name']}", t_w2, d_w2,
+                             w2_r["geometry"] if w2_r else [], d_stop["name"]))
+        return {"legs": legs, "total_min": total,
+                "total_dist_mi": round(d_w1 + d_ride + d_w2, 1), "transfers": len(legs) - 1}
+
+    # ── helper: drive → ride → walk ─────────────────────────────────
+    def _drive_ride_walk(hub, d_stop, ride_speed, ride_label_prefix) -> Optional[Dict]:
+        if not hub or not d_stop:
+            return None
+        drv_r  = osrm_route(olat, olon, hub["lat"], hub["lon"], "car")
+        ride_r = osrm_route(hub["lat"], hub["lon"], d_stop["lat"], d_stop["lon"], "car")
+        w_r    = osrm_route(d_stop["lat"], d_stop["lon"], dlat, dlon, "foot")
+
+        d_drv  = _haversine(olat, olon, hub["lat"], hub["lon"])
+        d_ride = _haversine(hub["lat"], hub["lon"], d_stop["lat"], d_stop["lon"])
+        d_w    = _haversine(d_stop["lat"], d_stop["lon"], dlat, dlon)
+
+        t_drv  = _dur_from_route(drv_r, d_drv, _CAR_SPEED_MPH)
+        t_ride = round(d_ride / ride_speed * 60, 1)
+        t_w    = _dur_from_route(w_r, d_w, _WALK_SPEED_MPH)
+        total  = round(t_drv + _BOARD_BUF_MIN + t_ride + t_w, 1)
+
+        legs = [
+            _leg("car",  f"Drive to {hub['name']}", t_drv, d_drv,
+                 drv_r["geometry"] if drv_r else [], hub["name"]),
+            _leg("ride", f"{ride_label_prefix} {hub['name']} → {d_stop['name']}",
+                 t_ride + _BOARD_BUF_MIN, d_ride,
+                 ride_r["geometry"] if ride_r else [], hub["name"]),
+        ]
+        if t_w > 0.5:
+            legs.append(_leg("walk", f"Walk from {d_stop['name']}", t_w, d_w,
+                             w_r["geometry"] if w_r else [], d_stop["name"]))
+        return {"legs": legs, "total_min": total,
+                "total_dist_mi": round(d_drv + d_ride + d_w, 1), "transfers": len(legs) - 1}
+
+    # ── PLAN C: Walk → Rail → Walk  (if rail stops exist) ──────────
+    o_rail = _near(olat, olon, _by_type(o_all, "Rail"))
+    d_rail = _near(dlat, dlon, _by_type(d_all, "Rail"))
+    wrw_rail = _walk_ride_walk(o_rail, d_rail, _RAIL_SPEED_MPH, "Rail")
+    if wrw_rail:
+        plans.append({**wrw_rail, "label": "Rail",  "tag": "Walk · Rail · Walk"})
+
+    # ── PLAN D: Walk → Bus → Walk ──────────────────────────────────
+    o_bus = _near(olat, olon, _by_type(o_all, "Bus", "Bus Station"))
+    d_bus = _near(dlat, dlon, _by_type(d_all, "Bus", "Bus Station"))
+    wrw_bus = _walk_ride_walk(o_bus, d_bus, _BUS_SPEED_MPH, "Bus")
+    if wrw_bus:
+        plans.append({**wrw_bus, "label": "Bus",    "tag": "Walk · Bus · Walk"})
+
+    # ── PLAN E: Drive → Rail → Walk ────────────────────────────────
+    drw_rail = _drive_ride_walk(o_rail, d_rail, _RAIL_SPEED_MPH, "Rail")
+    if drw_rail:
+        plans.append({**drw_rail, "label": "Drive + Rail", "tag": "Drive · Rail · Walk"})
+
+    # ── PLAN F: Drive → Bus → Walk ─────────────────────────────────
+    drw_bus = _drive_ride_walk(o_bus, d_bus, _BUS_SPEED_MPH, "Bus")
+    if drw_bus:
+        plans.append({**drw_bus, "label": "Drive + Bus", "tag": "Drive · Bus · Walk"})
+
+    # ── PLAN G: Walk → Rail → Walk → Bus → Walk  (rail + bus transfer) ──
+    # Only if we have rail at origin and bus at destination (or vice-versa)
+    if o_rail and d_bus:
+        # find a bus stop near the rail dest stop as a transfer point
+        mid_bus = _near(d_rail["lat"], d_rail["lon"], _by_type(d_all, "Bus", "Bus Station")) if d_rail else None
+        if mid_bus and d_bus:
+            w1_r  = osrm_route(olat, olon, o_rail["lat"], o_rail["lon"], "foot")
+            r1_r  = osrm_route(o_rail["lat"], o_rail["lon"], d_rail["lat"], d_rail["lon"], "car") if d_rail else None
+            w2_r  = osrm_route(d_rail["lat"], d_rail["lon"], mid_bus["lat"], mid_bus["lon"], "foot") if d_rail else None
+            r2_r  = osrm_route(mid_bus["lat"], mid_bus["lon"], d_bus["lat"], d_bus["lon"], "car")
+            w3_r  = osrm_route(d_bus["lat"], d_bus["lon"], dlat, dlon, "foot")
+
+            d1 = _haversine(olat, olon, o_rail["lat"], o_rail["lon"])
+            d2 = _haversine(o_rail["lat"], o_rail["lon"], d_rail["lat"], d_rail["lon"]) if d_rail else 0
+            d3 = _haversine(d_rail["lat"], d_rail["lon"], mid_bus["lat"], mid_bus["lon"]) if d_rail else 0
+            d4 = _haversine(mid_bus["lat"], mid_bus["lon"], d_bus["lat"], d_bus["lon"])
+            d5 = _haversine(d_bus["lat"], d_bus["lon"], dlat, dlon)
+
+            t1 = _dur_from_route(w1_r, d1, _WALK_SPEED_MPH)
+            t2 = round(d2 / _RAIL_SPEED_MPH * 60, 1)
+            t3 = _dur_from_route(w2_r, d3, _WALK_SPEED_MPH)
+            t4 = round(d4 / _BUS_SPEED_MPH * 60, 1)
+            t5 = _dur_from_route(w3_r, d5, _WALK_SPEED_MPH)
+            total = round(t1 + _BOARD_BUF_MIN + t2 + t3 + _BOARD_BUF_MIN + t4 + t5, 1)
+
+            legs = []
+            if t1 > 0.5:
+                legs.append(_leg("walk", f"Walk to {o_rail['name']}", t1, d1, w1_r["geometry"] if w1_r else []))
+            legs.append(_leg("ride", f"Rail {o_rail['name']} → {d_rail['name'] if d_rail else '…'}", t2 + _BOARD_BUF_MIN, d2, r1_r["geometry"] if r1_r else []))
+            if t3 > 0.5:
+                legs.append(_leg("walk", f"Transfer walk to {mid_bus['name']}", t3, d3, w2_r["geometry"] if w2_r else []))
+            legs.append(_leg("ride", f"Bus {mid_bus['name']} → {d_bus['name']}", t4 + _BOARD_BUF_MIN, d4, r2_r["geometry"] if r2_r else []))
+            if t5 > 0.5:
+                legs.append(_leg("walk", f"Walk from {d_bus['name']}", t5, d5, w3_r["geometry"] if w3_r else []))
+
+            plans.append({
+                "label": "Rail + Bus", "tag": "Walk · Rail · Walk · Bus · Walk",
+                "legs": legs, "total_min": total,
+                "total_dist_mi": round(d1+d2+d3+d4+d5, 1), "transfers": 2,
+            })
+
+    # ── PLAN H: Drive to intercity coach terminal ─────────────────
+    if nearby_intercity:
+        t = nearby_intercity[0]  # nearest
+        drv_r = osrm_route(olat, olon, t["lat"], t["lon"], "car")
+        d_drv = _haversine(olat, olon, t["lat"], t["lon"])
+        t_drv = _dur_from_route(drv_r, d_drv, _CAR_SPEED_MPH)
+        # estimate intercity ride: straight-line / 55 mph (highway coach)
+        t_ride = round(straight / 55 * 60, 1)
+        total  = round(t_drv + 15 + t_ride, 1)   # 15 min check-in buffer
+        carriers = ", ".join(t.get("carriers", []))
+        plans.append({
+            "label": "Intercity Coach",
+            "tag":   f"{carriers} from {t['city']}",
+            "legs": [
+                _leg("car",   f"Drive to {t['city']} terminal", t_drv, d_drv,
+                     drv_r["geometry"] if drv_r else [], t["city"]),
+                _leg("coach", f"Coach {t['city']} → destination  (schedule varies)",
+                     t_ride + 15, straight, [], t["city"]),
+            ],
+            "total_min": total,
+            "total_dist_mi": round(d_drv + straight, 1),
+            "transfers": 1,
+        })
+
+    # ── Rank & label ───────────────────────────────────────────────
+    # Sort by total_min
+    plans.sort(key=lambda p: p["total_min"])
+
+    # Tag the fastest
+    if plans:
+        plans[0]["badge"] = "Fastest"
+
+    # Tag fewest-transfers (excluding pure walk/drive which are 0)
+    multi = [p for p in plans if p["transfers"] > 0]
+    if multi:
+        fewest = min(multi, key=lambda p: (p["transfers"], p["total_min"]))
+        fewest.setdefault("badge", "Fewest transfers")
+
+    # Tag most-walking (highest walk proportion)
+    for p in plans:
+        walk_min = sum(l["duration_min"] for l in p["legs"] if l["mode"] == "walk")
+        p["_walk_pct"] = walk_min / max(p["total_min"], 1)
+    walky = [p for p in plans if p["transfers"] > 0]
+    if walky:
+        most_walk = max(walky, key=lambda p: p["_walk_pct"])
+        most_walk.setdefault("badge", "Most walking")
+
+    # Clean internal key
+    for p in plans:
+        p.pop("_walk_pct", None)
+
+    return plans
+
+
+# Keep the old signatures as thin wrappers so build_map / comparison
+# table code that references them still works without changes.
+def build_transit_itinerary(olat, olon, dlat, dlon, origin_stops, dest_stops):
+    """Legacy wrapper — returns the first walk·ride·walk plan or None."""
+    plans = build_multimodal_options(olat, olon, dlat, dlon, origin_stops, dest_stops, [])
+    for p in plans:
+        if "Walk" in p.get("tag","") and "Rail" not in p.get("tag","") and p["transfers"] > 0:
+            # repackage into the old shape so map rendering still works
+            return {
+                "legs": p["legs"], "total_min": p["total_min"],
+                "total_dist_mi": p["total_dist_mi"],
+                "origin_stop": {"name": p["legs"][0].get("stop","Stop"), "type":"Bus"},
+                "dest_stop":   {"name": p["legs"][-1].get("stop","Stop"), "type":"Bus"},
+                "steps": [l["label"] for l in p["legs"]],
+            }
+    return None
+
+def build_combined_itinerary(olat, olon, dlat, dlon, origin_stops, dest_stops):
+    """Legacy wrapper — returns the first drive·ride·walk plan or None."""
+    plans = build_multimodal_options(olat, olon, dlat, dlon, origin_stops, dest_stops, [])
+    for p in plans:
+        if "Drive" in p.get("label","") and p["transfers"] > 0:
+            return {
+                "legs": p["legs"], "total_min": p["total_min"],
+                "total_dist_mi": p["total_dist_mi"],
+                "hub":       {"name": p["legs"][0].get("stop","Hub"), "type":"Bus Station"},
+                "dest_stop": {"name": p["legs"][-1].get("stop","Stop"), "type":"Bus"},
+                "steps": [l["label"] for l in p["legs"]],
+            }
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -762,19 +947,23 @@ def _add_route_line(m, geom, mode_key, label, is_active):
 
 
 def build_map(olat, olon, dlat, dlon,
-              car_route, foot_route, transit_itin, combined_itin,
-              active_mode, route_fires, incidents,
+              route_fires, incidents,
               origin_stops, dest_stops,
               origin_label, dest_label,
-              intercity_terminals=None) -> folium.Map:
-
+              intercity_terminals=None,
+              active_plan=None,
+              all_plans=None) -> folium.Map:
+    """
+    active_plan – the currently-selected plan's leg list (drawn bold)
+    all_plans   – list of ALL plans; their legs are drawn faint underneath
+    """
     mid_lat, mid_lon = (olat + dlat) / 2, (olon + dlon) / 2
     dist_mi = _haversine(olat, olon, dlat, dlon)
     zoom = 7 if dist_mi > 200 else (8 if dist_mi > 80 else (10 if dist_mi > 30 else 12))
 
     m = folium.Map(location=[mid_lat, mid_lon], zoom_start=zoom, tiles="CartoDB positron")
 
-    # OSM road overlay (subtle, for road-network context)
+    # OSM road overlay (subtle)
     folium.TileLayer(
         tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         attr="© OpenStreetMap contributors",
@@ -782,7 +971,7 @@ def build_map(olat, olon, dlat, dlon,
         opacity=0.25,
     ).add_to(m)
 
-    # ── Origin / Destination ──
+    # ── Origin / Destination markers ──
     folium.Marker(
         [olat, olon],
         popup=f"<b>START</b><br>{origin_label}",
@@ -796,23 +985,25 @@ def build_map(olat, olon, dlat, dlon,
         tooltip="Destination",
     ).add_to(m)
 
-    # ── Active route (bold) ──
-    if active_mode == "driving" and car_route:
-        _add_route_line(m, car_route["geometry"], "car", "Driving", True)
-    elif active_mode == "walking" and foot_route:
-        _add_route_line(m, foot_route["geometry"], "foot", "Walking", True)
-    elif active_mode == "transit" and transit_itin:
-        for leg in transit_itin["legs"]:
-            _add_route_line(m, leg["geometry"], leg["mode"], leg["label"], True)
-    elif active_mode == "combined" and combined_itin:
-        for leg in combined_itin["legs"]:
-            _add_route_line(m, leg["geometry"], leg["mode"], leg["label"], True)
+    # ── Faint lines for every OTHER plan ──
+    active_geoms = set()  # collect active geometries to skip in faint pass
+    if active_plan:
+        for leg in active_plan:
+            g = leg.get("geometry")
+            if g:
+                active_geoms.add(id(g))
 
-    # ── Faint inactive routes ──
-    if active_mode != "driving" and car_route:
-        _add_route_line(m, car_route["geometry"], "car", "Driving (inactive)", False)
-    if active_mode != "walking" and foot_route:
-        _add_route_line(m, foot_route["geometry"], "foot", "Walking (inactive)", False)
+    if all_plans:
+        for plan in all_plans:
+            for leg in plan.get("legs", []):
+                g = leg.get("geometry")
+                if g and id(g) not in active_geoms:
+                    _add_route_line(m, g, leg["mode"], leg["label"], False)
+
+    # ── Bold active plan ──
+    if active_plan:
+        for leg in active_plan:
+            _add_route_line(m, leg.get("geometry"), leg["mode"], leg["label"], True)
 
     # ── Transit-stop pins ──
     for stop in origin_stops[:15]:
@@ -1001,12 +1192,14 @@ def render_directions_page(fire_data, vulnerable_populations):
             })
     nearby_intercity = sorted(nearby_intercity, key=lambda x: x["dist_mi"])[:6]
 
-    # ── Compute all routes ──
-    with st.spinner("Calculating routes…"):
-        car_route     = osrm_route(olat, olon, dlat, dlon, "car")
-        foot_route    = osrm_route(olat, olon, dlat, dlon, "foot")
-        transit_itin  = build_transit_itinerary(olat, olon, dlat, dlon, origin_stops, dest_stops)
-        combined_itin = build_combined_itinerary(olat, olon, dlat, dlon, origin_stops, dest_stops)
+    # ── Compute all route plans (multimodal engine) ──
+    with st.spinner("Calculating all route options…"):
+        all_plans = build_multimodal_options(olat, olon, dlat, dlon,
+                                            origin_stops, dest_stops,
+                                            nearby_intercity)
+
+    # Also grab the raw car route for turn-by-turn directions
+    car_route = osrm_route(olat, olon, dlat, dlon, "car")
 
     # ── Fires along route ──
     route_fires = get_route_fires(olat, olon, dlat, dlon, fire_data, buffer_mi=20)
@@ -1026,76 +1219,52 @@ def render_directions_page(fire_data, vulnerable_populations):
         for f in route_fires[:4]:
             st.caption(f"  • {f['name']} — {f['min_dist_mi']} mi from route ({f['acres']:,.0f} acres)")
 
-    # ── Road-incident advisory (nationwide) ──
-    st.markdown("---")
-    st.subheader("Road Conditions")
-
+    # ── Road-incident advisory ──
     if incidents:
-        # Group by source so NC / CA / WA / OSM labels are clear
-        by_source: Dict[str, List[Dict]] = {}
+        src_groups: Dict[str, list] = {}
         for inc in incidents:
-            by_source.setdefault(inc.get("source", "Other"), []).append(inc)
+            src = inc.get("source", "Unknown")
+            src_groups.setdefault(src, []).append(inc)
+        st.warning(f"**{len(incidents)} road incident(s)** detected near your route.")
+        for src, group in src_groups.items():
+            st.caption(f"  Source: {src} — {len(group)} incident(s)")
+            for inc in group[:3]:
+                title = inc.get("title") or inc.get("Title") or inc.get("description") or "Incident"
+                st.caption(f"    • {title}")
+        state_abbr = _extract_state(st.session_state.dir_origin)
+        dot = STATE_DOT_LINKS.get(state_abbr)
+        if dot:
+            st.caption(f"For full road conditions: [{dot['name']} DOT]({dot['url']}) • Call 511")
 
-        st.warning(
-            f"**{len(incidents)} road issue(s) found along your route**  "
-            f"(updated {datetime.now().strftime('%H:%M')})."
-        )
-        for source, group in by_source.items():
-            st.markdown(f"**{source}** — {len(group)} issue(s)")
-            for inc in group[:6]:
-                title = inc.get("title", "Incident")
-                road  = inc.get("road", "")
-                sev   = inc.get("severity", "")
-                line  = f"  • {title}"
-                if road:   line += f" — {road}"
-                if sev:    line += f"  [{sev}]"
-                st.caption(line)
-            if len(group) > 6:
-                st.caption(f"  … and {len(group)-6} more.")
-    else:
-        st.success("No road issues detected along your route right now.")
+    # ── Session state for selected plan index ──
+    if "dir_selected_plan" not in st.session_state:
+        st.session_state.dir_selected_plan = 0
+    # Clamp if plans changed
+    if st.session_state.dir_selected_plan >= len(all_plans):
+        st.session_state.dir_selected_plan = 0
 
-    # Always show the correct state DOT link for origin
-    if state_o and state_o in STATE_DOT_LINKS:
-        dot = STATE_DOT_LINKS[state_o]
-        st.caption(
-            f"Full {dot['name']} conditions: "
-            f"[{dot['name']} DOT]({dot['url']})  •  Call **511** anywhere in the US."
-        )
-    else:
-        st.caption("Call **511** from anywhere in the US for real-time road conditions.")
+    # ── COLOUR map for leg-bar badges ──
+    LEG_COLOURS = {
+        "car":   ("#2563eb", "#fff"),
+        "walk":  ("#16a34a", "#fff"),
+        "ride":  ("#9333ea", "#fff"),
+        "coach": ("#0d9488", "#fff"),
+    }
 
-    # ── Summary metrics ──
-    drive_eta  = car_route["duration_min"]  if car_route  else round(straight_mi * 1.3 / 45 * 60, 0)
-    drive_dist = car_route["distance_mi"]   if car_route  else round(straight_mi * 1.3, 1)
-    walk_eta   = foot_route["duration_min"] if foot_route else round(straight_mi * 1.2 / 3.5 * 60, 0)
-    walk_dist  = foot_route["distance_mi"]  if foot_route else round(straight_mi * 1.2, 1)
+    # ── Two top-level tabs: Driving (turn-by-turn) | All Routes ──
+    tab_drive, tab_routes = st.tabs(["Driving (turn-by-turn)", "All Route Options"])
 
-    # ── MODE TABS ──
-    st.markdown("---")
+    # ─── TAB: DRIVING (turn-by-turn) ────────────────────────────────
+    with tab_drive:
+        drive_plan = next((p for p in all_plans if p["label"] == "Drive"), None)
+        drive_dur  = drive_plan["total_min"] if drive_plan else 0
+        drive_dist = drive_plan["total_dist_mi"] if drive_plan else 0
 
-    tab_labels = [
-        f"Driving  ({_fmt(drive_eta)})",
-        f"Walking  ({_fmt(walk_eta)})",
-    ]
-    if transit_itin:
-        tab_labels.append(f"Transit  ({_fmt(transit_itin['total_min'])})")
-    if combined_itin:
-        tab_labels.append(f"Combined  ({_fmt(combined_itin['total_min'])})")
-    tab_labels.append("Intercity Bus")
-
-    tabs = st.tabs(tab_labels)
-    active_mode = "driving"
-
-    # ── TAB: DRIVING ──
-    with tabs[0]:
-        active_mode = "driving"
-        st.subheader("Driving Directions")
         ca, cb = st.columns(2)
         ca.metric("Distance", f"{drive_dist} mi")
-        cb.metric("ETA", _fmt(drive_eta))
+        cb.metric("ETA", _fmt(drive_dur))
 
-        if car_route and car_route["steps"]:
+        if car_route and car_route.get("steps"):
             st.markdown("**Turn-by-Turn**")
             for i, step in enumerate(car_route["steps"][:25], 1):
                 st.write(f"{i}. {step}")
@@ -1105,144 +1274,97 @@ def render_directions_page(fire_data, vulnerable_populations):
             st.info("Turn-by-turn data unavailable from OSRM right now. Use the map below.")
         st.markdown("**Tips:** Check **511** or your state DOT for closures. Fill up gas. Carry water.")
 
-    # ── TAB: WALKING ──
-    with tabs[1]:
-        active_mode = "walking"
-        st.subheader("Walking Directions")
-        ca, cb = st.columns(2)
-        ca.metric("Distance", f"{walk_dist} mi")
-        cb.metric("ETA", _fmt(walk_eta))
-        if walk_dist > 25:
-            st.warning("This route is over 25 miles on foot — consider driving or transit instead.")
-        if foot_route and foot_route["steps"]:
-            st.markdown("**Step-by-Step**")
-            for i, step in enumerate(foot_route["steps"][:25], 1):
-                st.write(f"{i}. {step}")
-            if len(foot_route["steps"]) > 25:
-                st.caption(f"… and {len(foot_route['steps']) - 25} more steps.")
-        else:
-            st.info("Walking step data unavailable from OSRM. Use the map below.")
-        st.markdown("**Tips:** Wear sturdy shoes. Carry water. Stay on sidewalks. If fires are nearby, shelter and call 911.")
+        # Selecting this tab highlights the drive plan on the map
+        drive_idx = next((i for i, p in enumerate(all_plans) if p["label"] == "Drive"), 0)
+        st.session_state.dir_selected_plan = drive_idx
 
-    # ── TAB: TRANSIT ──
-    tidx = 2
-    if transit_itin and tidx < len(tabs):
-        with tabs[tidx]:
-            active_mode = "transit"
-            st.subheader("Public Transit Route")
-            ca, cb, cc = st.columns(3)
-            ca.metric("Total Time", _fmt(transit_itin["total_min"]))
-            cb.metric("Board At", transit_itin["origin_stop"]["name"])
-            cc.metric("Exit At", transit_itin["dest_stop"]["name"])
+    # ─── TAB: ALL ROUTE OPTIONS (Google Maps-style cards) ──────────
+    with tab_routes:
+        st.caption(
+            "Compare all available routes. Click a route to highlight it on the map below. "
+            "Times are estimates — check carrier apps for live schedules."
+        )
 
-            st.markdown("**Itinerary**")
-            for i, step in enumerate(transit_itin["steps"], 1):
-                st.write(f"{i}. {step}")
+        for idx, plan in enumerate(all_plans):
+            is_selected = (st.session_state.dir_selected_plan == idx)
+            badge_text  = plan.get("badge", "")
+            label       = plan["label"]
+            total_min   = plan["total_min"]
+            transfers   = plan["transfers"]
 
-            st.warning(
-                "Live transit schedules are not included in this tool. "
-                "Check your local transit agency app for real departure times. "
-                "Transit may be suspended during active emergencies."
-            )
-            if origin_stops:
-                st.markdown("**Nearby Stops (Origin)**")
-                for s in sorted(origin_stops, key=lambda x: _haversine(olat, olon, x["lat"], x["lon"]))[:6]:
-                    d = _haversine(olat, olon, s["lat"], s["lon"])
-                    line = f"  {s['type']}  •  {s['name']}  •  {d:.2f} mi"
-                    if s.get("operator"):
-                        line += f"  •  {s['operator']}"
-                    st.caption(line)
-            tidx += 1
+            # ── Card border styling ──
+            border_color = "#2563eb" if is_selected else "#e2e8f0"
+            border_width = "3px" if is_selected else "1px"
 
-    # ── TAB: COMBINED ──
-    if combined_itin and tidx < len(tabs):
-        with tabs[tidx]:
-            active_mode = "combined"
-            st.subheader("Drive + Transit (Combined)")
-            ca, cb, cc = st.columns(3)
-            ca.metric("Total Time", _fmt(combined_itin["total_min"]))
-            cb.metric("Drive to", combined_itin["hub"]["name"])
-            cc.metric("Exit at", combined_itin["dest_stop"]["name"])
-
-            st.markdown("**Itinerary**")
-            for i, step in enumerate(combined_itin["steps"], 1):
-                st.write(f"{i}. {step}")
-            st.info("Drive to the transit hub, park, board, ride to near your destination, then walk.")
-            tidx += 1
-
-    # ── TAB: INTERCITY BUS ──
-    if tidx < len(tabs):
-        with tabs[tidx]:
-            st.subheader("Intercity Bus Options")
-            st.caption(
-                "Greyhound, FlixBus, and Megabus terminals near your origin. "
-                "Book tickets directly on each carrier's site or app before departing."
+            st.markdown(
+                f'<div style="border:{border_width} solid {border_color}; border-radius:12px; '
+                f'padding:14px 16px; margin-bottom:10px; background:#{'f0f7ff' if is_selected else 'ffffff'};">',
+                unsafe_allow_html=True,
             )
 
-            if nearby_intercity:
-                for t in nearby_intercity:
-                    carriers = ", ".join(t.get("carriers", []))
-                    addr     = t.get("address", "")
-                    dist     = t.get("dist_mi", "?")
-                    st.markdown(
-                        f"**{t['city']}** — {dist} mi away\n"
-                        f"Carriers: {carriers}\n"
-                        f"Address: {addr}"
-                    )
-                    # Booking links
-                    links = []
-                    for c in t.get("carriers", []):
-                        cl = c.lower()
-                        if "greyhound" in cl:
-                            links.append("[Greyhound](https://www.greyhoundlines.com/en-us/)")
-                        elif "flixbus" in cl:
-                            links.append("[FlixBus](https://www.flixbus.com/)")
-                        elif "megabus" in cl:
-                            links.append("[Megabus](https://us.megabus.com/)")
-                    if links:
-                        st.caption("Book:  " + "  •  ".join(links))
-                    st.markdown("---")
-            else:
-                st.info("No intercity terminals found near your origin. Check greyhoundlines.com or flixbus.com directly.")
+            # Header row: label + badge + time
+            hcols = st.columns([3, 1, 1.5])
+            hcols[0].markdown(f"**{label}**" + (f"  <span style='background:#2563eb;color:#fff;border-radius:4px;padding:1px 7px;font-size:12px;'>{badge_text}</span>" if badge_text else ""), unsafe_allow_html=True)
+            hcols[1].markdown(f"<span style='color:#64748b;font-size:13px;'>{transfers} transfer{"s" if transfers != 1 else ""}</span>", unsafe_allow_html=True)
+            hcols[2].markdown(f"<span style='font-weight:700;font-size:18px;'>{_fmt(total_min)}</span>", unsafe_allow_html=True)
 
-            st.warning(
-                "Schedules and availability are not shown here — always confirm departure times "
-                "on the carrier's website or app before heading to the terminal. "
-                "Service may be limited or suspended during active wildfire emergencies."
-            )
+            # ── Leg bar: coloured blocks proportional to time ──
+            total_t = plan["total_min"] or 1
+            bar_html = '<div style="display:flex;width:100%;height:28px;border-radius:6px;overflow:hidden;margin:8px 0;">'
+            for leg in plan["legs"]:
+                pct    = max(leg["duration_min"] / total_t * 100, 8)
+                bg, fg = LEG_COLOURS.get(leg["mode"], ("#94a3b8", "#fff"))
+                short  = leg["label"][:22] + "…" if len(leg["label"]) > 22 else leg["label"]
+                bar_html += (
+                    f'<div style="flex:{pct};background:{bg};color:{fg};'
+                    f'display:flex;align-items:center;justify-content:center;'
+                    f'font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;'
+                    f'padding:0 4px;" title="{leg['label']} — {_fmt(leg['duration_min'])}">'
+                    f'{short}</div>'
+                )
+            bar_html += '</div>'
+            st.markdown(bar_html, unsafe_allow_html=True)
 
-    # ── COMPARISON TABLE ──
-    st.markdown("---")
-    st.subheader("Mode Comparison")
-    rows = [
-        {"Mode": "Driving",  "Distance": f"{drive_dist} mi", "ETA": _fmt(drive_eta),
-         "Notes": "Fastest for most intercity. Check 511 for closures."},
-        {"Mode": "Walking",  "Distance": f"{walk_dist} mi",  "ETA": _fmt(walk_eta),
-         "Notes": "Practical under ~10 mi. Watch for fire zones."},
-    ]
-    if transit_itin:
-        rows.append({"Mode": "Transit", "Distance": f"{transit_itin['total_dist_mi']} mi",
-                     "ETA": _fmt(transit_itin["total_min"]),
-                     "Notes": f"Walk → {transit_itin['origin_stop']['name']} → ride → {transit_itin['dest_stop']['name']} → walk."})
-    if combined_itin:
-        rows.append({"Mode": "Combined", "Distance": f"{combined_itin['total_dist_mi']} mi",
-                     "ETA": _fmt(combined_itin["total_min"]),
-                     "Notes": f"Drive → {combined_itin['hub']['name']} → ride → {combined_itin['dest_stop']['name']} → walk."})
-    if nearby_intercity:
-        rows.append({"Mode": "Intercity Bus", "Distance": f"{nearby_intercity[0]['dist_mi']} mi to terminal",
-                     "ETA": "Varies by schedule",
-                     "Notes": f"Nearest: {nearby_intercity[0]['city']} ({', '.join(nearby_intercity[0]['carriers'])}). Book online."})
-    st.table(rows)
+            # ── Step list ──
+            for leg in plan["legs"]:
+                icon = {"car": "🚗", "walk": "🚶", "ride": "🚌", "coach": "🚌"}.get(leg["mode"], "•")
+                st.caption(f"{icon}  {leg['label']}  —  {_fmt(leg['duration_min'])}  ({leg['dist_mi']} mi)")
+
+            # Intercity coach booking links
+            if any(l["mode"] == "coach" for l in plan["legs"]):
+                t = nearby_intercity[0] if nearby_intercity else {}
+                links = []
+                for c in t.get("carriers", []):
+                    cl = c.lower()
+                    if "greyhound" in cl:  links.append("[Greyhound](https://www.greyhoundlines.com/en-us/)")
+                    elif "flixbus" in cl:  links.append("[FlixBus](https://www.flixbus.com/)")
+                    elif "megabus" in cl:  links.append("[Megabus](https://us.megabus.com/)")
+                if links:
+                    st.caption("Book:  " + "  •  ".join(links))
+
+            # ── Select button ──
+            if not is_selected:
+                if st.button(f"Select this route", key=f"sel_plan_{idx}"):
+                    st.session_state.dir_selected_plan = idx
+                    st.rerun()
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.warning(
+            "Transit and coach times are estimates. Always check your local transit agency "
+            "or carrier app for live schedules. Services may be suspended during emergencies."
+        )
 
     # ── INTERACTIVE MAP ──
     st.markdown("---")
     st.subheader("Route Map")
-    st.caption("Active route is bold; faint lines = other available modes. Red/orange = fire zones. Purple dots = transit stops. Teal diamonds = intercity coach terminals.")
+    st.caption("Selected route is bold; other routes shown faint. Red = fire zones. Purple = transit stops. Teal ◆ = intercity coach.")
+
+    selected_idx  = st.session_state.dir_selected_plan
+    active_plan   = all_plans[selected_idx]["legs"] if all_plans else None
 
     m = build_map(
         olat, olon, dlat, dlon,
-        car_route, foot_route, transit_itin, combined_itin,
-        active_mode=active_mode,
         route_fires=route_fires,
         incidents=incidents,
         origin_stops=origin_stops,
@@ -1250,8 +1372,11 @@ def render_directions_page(fire_data, vulnerable_populations):
         origin_label=st.session_state.dir_origin.title(),
         dest_label=st.session_state.dir_dest.title(),
         intercity_terminals=nearby_intercity,
+        active_plan=active_plan,
+        all_plans=all_plans,
     )
-    st_folium(m, width="100%", height=650)
+    st_folium(m, width="100%", height=650, key="directions_route_map")
+
 
     # ── Emergency footer ──
     st.markdown("---")

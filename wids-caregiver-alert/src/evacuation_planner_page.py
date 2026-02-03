@@ -819,7 +819,7 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
     </div>"""
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    st_folium(m, width="100%", height=600)
+    st_folium(m, width="100%", height=600, key="evac_shelter_map")
 
     # ── Emergency resources ──
     st.markdown("---")
