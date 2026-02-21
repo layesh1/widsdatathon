@@ -295,7 +295,7 @@ def show_dashboard():
             Source: {fire.get('data_source', 'Unknown')}
             """
             
-            folium.Circle Marker(
+            folium.CircleMarker(
                 location=[fire['latitude'], fire['longitude']],
                 radius=radius,
                 popup=folium.Popup(popup_text, max_width=250),
