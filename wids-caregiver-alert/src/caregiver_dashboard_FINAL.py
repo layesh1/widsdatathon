@@ -1,16 +1,11 @@
 """
-caregiver_dashboard_FINAL.py  —  patched
+caregiver_dashboard_FINAL.py  —  49ers Intelligence Lab WiDS 2025
 
-Changes
-───────
-1  Logo: the via.placeholder.com image (always broken) is replaced with an
-   inline SVG rendered via st.markdown.  When the team's Canva logo is ready
-   just drop the PNG into src/ and swap in st.image("logo.png").
-2  SVI path resolution: all relative paths are now anchored to the directory
-   of THIS file (via __file__), so the app works no matter where the user
-   runs `streamlit run` from.  Added the full repo layout variants.
-3  Emoji pass: removed decorative emoji clusters in sidebar and headers;
-   kept single-purpose warning/success icons only.
+Role-based pages:
+  Emergency Worker  →  Command Dashboard, AI Assistant
+  Caregiver/Evacuee →  Start Here, Evacuation Planner, Safe Routes & Transit, AI Assistant
+  Data Analyst      →  Dashboard, Equity Analysis, Risk Calculator, Impact Projection,
+                       AI Assistant, About
 """
 
 import streamlit as st
@@ -18,849 +13,606 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
 import folium
 from streamlit_folium import st_folium
-import os
+import os, base64, anthropic
 
-# ── resolve THIS file's directory so all relative paths work ─────────
+try:
+    from geo_map import render_map_with_controls
+    GEO_MAP_AVAILABLE = True
+except Exception:
+    GEO_MAP_AVAILABLE = False
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Import fire data integration
 from fire_data_integration import get_all_us_fires, get_fire_statistics, find_nearby_fires
 
-# Import evacuation routes
 try:
-    from evacuation_routes import generate_evacuation_routes_for_alerts, calculate_evacuation_plan
+    from evacuation_routes import generate_evacuation_routes_for_alerts
     EVACUATION_AVAILABLE = True
 except Exception:
     EVACUATION_AVAILABLE = False
 
-# Import OSM routing (optional - requires network)
 try:
-    from osm_routing import get_real_driving_route, calculate_evacuation_route_osm
+    from osm_routing import get_real_driving_route
     OSM_ROUTING_AVAILABLE = True
 except Exception:
     OSM_ROUTING_AVAILABLE = False
 
-# Import evacuation planner page
 try:
     from evacuation_planner_page import render_evacuation_planner_page
     PLANNER_AVAILABLE = True
 except Exception:
     PLANNER_AVAILABLE = False
 
-# Import directions & navigation page
 try:
     from directions_page import render_directions_page
     DIRECTIONS_AVAILABLE = True
 except Exception:
     DIRECTIONS_AVAILABLE = False
 
-# ── page config ──────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Wildfire Caregiver Alert System",
-    page_icon="🔥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ── Page config & CSS ────────────────────────────────────────────────
+st.set_page_config(page_title="Wildfire Caregiver Alert System", page_icon="🔥",
+                   layout="wide", initial_sidebar_state="expanded")
 
-# ── CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #FF4B4B;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-    }
-    .risk-high {
-        background-color: #FF4B4B;
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        font-weight: bold;
-    }
-    .risk-medium {
-        background-color: #FFA500;
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        font-weight: bold;
-    }
-    .risk-low {
-        background-color: #00CC00;
-        color: white;
-        padding: 1rem;
-        border-radius: 8px;
-        font-weight: bold;
-    }
+.main-header{font-size:2.5rem;font-weight:700;color:#FF4B4B;text-align:center;margin-bottom:2rem;}
+.risk-high  {background:#FF4B4B;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
+.risk-medium{background:#FFA500;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
+.risk-low   {background:#00CC00;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
+# ── Logo ─────────────────────────────────────────────────────────────
+def get_logo_b64():
+    p = os.path.join(_HERE, "49ers_logo.png")
+    if os.path.exists(p):
+        with open(p, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
-# ══════════════════════════════════════════════════════════════════════
-# DATA LOADERS
-# ══════════════════════════════════════════════════════════════════════
+def render_logo(width=110, shape="circle"):
+    b64 = get_logo_b64()
+    if b64:
+        r = "50%" if shape == "circle" else "12px"
+        st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem;">'
+                    f'<img src="data:image/png;base64,{b64}" width="{width}" '
+                    f'style="border-radius:{r};"/></div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="text-align:center;font-size:1.2rem;font-weight:bold;'
+                    'color:#f5a623;margin-bottom:1rem;">49ers Intelligence Lab</div>',
+                    unsafe_allow_html=True)
+
+# ── Auth ─────────────────────────────────────────────────────────────
+CREDENTIALS = {
+    "dispatcher": {"password":"fire2025","role":"emergency_worker","display":"Emergency Evacuator"},
+    "caregiver":  {"password":"evacuate","role":"evacuee",         "display":"Caregiver / Evacuee"},
+    "analyst":    {"password":"datathon","role":"analyst",         "display":"Data Analyst"},
+}
+
+ROLE_PAGES = {
+    "emergency_worker": ["Command Dashboard","AI Assistant"],
+    "evacuee":          ["Start Here","Evacuation Planner","Safe Routes & Transit","AI Assistant"],
+    "analyst":          ["Dashboard","Equity Analysis","Risk Calculator",
+                         "Impact Projection","AI Assistant","About"],
+}
+
+ROLE_COLORS = {
+    "emergency_worker":"#ff4b4b",
+    "evacuee":"#4b9fff",
+    "analyst":"#4bff9f",
+}
+
+# ── AI system prompts ────────────────────────────────────────────────
+SYSTEM_PROMPTS = {
+    "emergency_worker": """You are EVAC-OPS, an AI command assistant for emergency evacuation
+coordinators in the 49ers Intelligence Lab Wildfire Evacuation System.
+CAPABILITIES: CDC SVI vulnerable-population data, wildfire perimeter/zone data (A/B/C),
+USFA Fire Department Registry (staffing/stations), geospatial hotspot detection,
+survival analysis evacuation probability outputs.
+STYLE: Terse, direct, action-oriented. Status: EVACUATED/IN PROGRESS/UNACCOUNTED/SHELTER-IN-PLACE.
+Flag oxygen/wheelchair/dialysis as PRIORITY RED. Draft SITREPs on request. Label demo data [DEMO DATA].""",
+
+    "evacuee": """You are SAFE-PATH, a calm friendly AI helping evacuees and caregivers
+during a wildfire emergency. Part of the 49ers Intelligence Lab system.
+HELP WITH: Step-by-step evacuation, zone meanings (A=leave NOW/B=ready/C=monitor),
+nearest accessible shelter, caregiver guidance (mobility, oxygen, dialysis, dementia,
+children with disabilities), go-bag checklist, registering for assistance.
+STYLE: Warm, calm, plain language, numbered steps. If immediate danger: call 911 first.
+Label demo data [DEMO DATA].""",
+
+    "analyst": """You are DATA-LAB, technical AI for data scientists on the 49ers Intelligence Lab
+WiDS Datathon 2025 project (2nd place): Wildfire Evacuation Alert System.
+STACK: Python, Streamlit, CDC SVI 2022, GOES-16/17, Census shapefiles.
+MODELS: Cox Proportional Hazards survival analysis, Getis-Ord Gi* hotspot detection,
+alert classification triage. NEW: USFA Fire Department Registry (locations, staffing, stations).
+HELP WITH: methodology, feature engineering, model improvements, SVI interpretation,
+code review, judge explanations, literature suggestions.
+STYLE: Technical, rigorous, proactive about limitations.""",
+}
+
+# ── Data loaders ─────────────────────────────────────────────────────
+@st.cache_data
+def load_usfa_data():
+    for p in [os.path.realpath(c) for c in [
+        os.path.join(_HERE, "usfa-registry-national.csv"),
+        os.path.join(_HERE, "..", "usfa-registry-national.csv"),
+        "usfa-registry-national.csv",
+    ]]:
+        if os.path.exists(p):
+            try:
+                df = pd.read_csv(p, dtype=str)
+                df.columns = df.columns.str.strip()
+                for col in ['Number Of Stations','Active Firefighters - Career',
+                            'Active Firefighters - Volunteer','Active Firefighters - Paid per Call']:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+                return df
+            except Exception as e:
+                st.sidebar.warning(f"USFA load error: {e}")
+    return None
 
 @st.cache_data
 def load_exact_county_coordinates():
-    """Load county centroids from Census file."""
-    candidates = [
-        os.path.join(_HERE, "..", "..", "..", "wids-caregiver-alert", "data", "CenPop2020_Mean_CO.txt"),
-        os.path.join(_HERE, "..", "data", "CenPop2020_Mean_CO.txt"),
-        os.path.join(_HERE, "..", "..", "wids-caregiver-alert", "data", "CenPop2020_Mean_CO.txt"),
-        os.path.join(_HERE, "data", "CenPop2020_Mean_CO.txt"),
-        os.path.join("wids-caregiver-alert", "data", "CenPop2020_Mean_CO.txt"),
-        os.path.join("data", "CenPop2020_Mean_CO.txt"),
-    ]
-    candidates = [os.path.realpath(c) for c in candidates]
-
-    census_path = None
-    for p in candidates:
+    for p in [os.path.realpath(c) for c in [
+        os.path.join(_HERE,"..","..","..","wids-caregiver-alert","data","CenPop2020_Mean_CO.txt"),
+        os.path.join(_HERE,"..","data","CenPop2020_Mean_CO.txt"),
+        os.path.join(_HERE,"data","CenPop2020_Mean_CO.txt"),
+        "data/CenPop2020_Mean_CO.txt",
+    ]]:
         if os.path.exists(p):
-            census_path = p
-            break
-
-    if not census_path:
-        st.sidebar.warning("County centroids file not found.  Falling back to state centres.")
-        return None
-
-    try:
-        df = pd.read_csv(census_path, dtype={"STATEFP": str, "COUNTYFP": str})
-        st.sidebar.info(f"Loaded {len(df)} counties from Census file.")
-        coords = {}
-        for _, row in df.iterrows():
-            fips = str(row["STATEFP"]).zfill(2) + str(row["COUNTYFP"]).zfill(3)
-            coords[fips] = (float(row["LATITUDE"]), float(row["LONGITUDE"]))
-        st.sidebar.success(f"Exact coordinates: {len(coords)} counties")
-        return coords
-    except Exception as e:
-        st.sidebar.warning(f"Census data error: {e}")
-        return None
-
+            try:
+                df = pd.read_csv(p, dtype={"STATEFP":str,"COUNTYFP":str})
+                return {str(r["STATEFP"]).zfill(2)+str(r["COUNTYFP"]).zfill(3):
+                        (float(r["LATITUDE"]),float(r["LONGITUDE"])) for _,r in df.iterrows()}
+            except Exception:
+                pass
+    return None
 
 @st.cache_data
 def load_state_coordinates():
-    return {
-        '01': (32.806671, -86.791130), '02': (61.370716, -152.404419), '04': (33.729759, -111.431221),
-        '05': (34.969704, -92.373123), '06': (36.116203, -119.681564), '08': (39.059811, -105.311104),
-        '09': (41.597782, -72.755371), '10': (39.318523, -75.507141), '12': (27.766279, -81.686783),
-        '13': (33.040619, -83.643074), '15': (21.094318, -157.498337), '16': (44.240459, -114.478828),
-        '17': (40.349457, -88.986137), '18': (39.849426, -86.258278), '19': (42.011539, -93.210526),
-        '20': (38.526600, -96.726486), '21': (37.668140, -84.670067), '22': (31.169546, -91.867805),
-        '23': (44.693947, -69.381927), '24': (39.063946, -76.802101), '25': (42.230171, -71.530106),
-        '26': (43.326618, -84.536095), '27': (45.694454, -93.900192), '28': (32.741646, -89.678696),
-        '29': (38.456085, -92.288368), '30': (46.921925, -110.454353), '31': (41.125370, -98.268082),
-        '32': (38.313515, -117.055374), '33': (43.452492, -71.563896), '34': (40.298904, -74.521011),
-        '35': (34.840515, -106.248482), '36': (42.165726, -74.948051), '37': (35.630066, -79.806419),
-        '38': (47.528912, -99.784012), '39': (40.388783, -82.764915), '40': (35.565342, -96.928917),
-        '41': (44.572021, -122.070938), '42': (40.590752, -77.209755), '44': (41.680893, -71.511780),
-        '45': (33.856892, -80.945007), '46': (44.299782, -99.438828), '47': (35.747845, -86.692345),
-        '48': (31.054487, -97.563461), '49': (40.150032, -111.862434), '50': (44.045876, -72.710686),
-        '51': (37.769337, -78.169968), '53': (47.400902, -121.490494), '54': (38.491226, -80.954453),
-        '55': (44.268543, -89.616508), '56': (42.755966, -107.302490), '11': (38.897438, -77.026817),
-    }
-
+    return {'01':(32.81,-86.79),'02':(61.37,-152.40),'04':(33.73,-111.43),'05':(34.97,-92.37),
+            '06':(36.12,-119.68),'08':(39.06,-105.31),'09':(41.60,-72.76),'10':(39.32,-75.51),
+            '12':(27.77,-81.69),'13':(33.04,-83.64),'15':(21.09,-157.50),'16':(44.24,-114.48),
+            '17':(40.35,-88.99),'18':(39.85,-86.26),'19':(42.01,-93.21),'20':(38.53,-96.73),
+            '21':(37.67,-84.67),'22':(31.17,-91.87),'23':(44.69,-69.38),'24':(39.06,-76.80),
+            '25':(42.23,-71.53),'26':(43.33,-84.54),'27':(45.69,-93.90),'28':(32.74,-89.68),
+            '29':(38.46,-92.29),'30':(46.92,-110.45),'31':(41.13,-98.27),'32':(38.31,-117.06),
+            '33':(43.45,-71.56),'34':(40.30,-74.52),'35':(34.84,-106.25),'36':(42.17,-74.95),
+            '37':(35.63,-79.81),'38':(47.53,-99.78),'39':(40.39,-82.76),'40':(35.57,-96.93),
+            '41':(44.57,-122.07),'42':(40.59,-77.21),'44':(41.68,-71.51),'45':(33.86,-80.95),
+            '46':(44.30,-99.44),'47':(35.75,-86.69),'48':(31.05,-97.56),'49':(40.15,-111.86),
+            '50':(44.05,-72.71),'51':(37.77,-78.17),'53':(47.40,-121.49),'54':(38.49,-80.95),
+            '55':(44.27,-89.62),'56':(42.76,-107.30),'11':(38.90,-77.03)}
 
 @st.cache_data
 def load_vulnerable_populations():
-    """
-    Load vulnerable populations from CDC SVI data.
-    Paths anchored to _HERE so this works from any CWD.
-    """
-    candidates = [
-        # three levels up from src/ → repo root (Streamlit Cloud layout)
-        os.path.join(_HERE, "..", "..", "..", "01_raw_data", "external", "SVI_2022_US_county.csv"),
-        # two levels up from src/ → repo root (local layout)
-        os.path.join(_HERE, "..", "..", "01_raw_data", "external", "SVI_2022_US_county.csv"),
-        # one level up from src/ → wids-caregiver-alert root
-        os.path.join(_HERE, "..", "01_raw_data", "external", "SVI_2022_US_county.csv"),
-        # if run from repo root directly
-        os.path.join("01_raw_data", "external", "SVI_2022_US_county.csv"),
-        # inside data/ subfolder
-        os.path.join(_HERE, "..", "data", "SVI_2022_US_county.csv"),
-        os.path.join("data", "SVI_2022_US_county.csv"),
-    ]
-    # realpath every candidate so ".." segments resolve fully before exists()
-    candidates = [os.path.realpath(c) for c in candidates]
-
-    svi_path = None
-    for p in candidates:
+    for p in [os.path.realpath(c) for c in [
+        os.path.join(_HERE,"..","..","..","01_raw_data","external","SVI_2022_US_county.csv"),
+        os.path.join(_HERE,"..","..","01_raw_data","external","SVI_2022_US_county.csv"),
+        os.path.join(_HERE,"..","01_raw_data","external","SVI_2022_US_county.csv"),
+        "01_raw_data/external/SVI_2022_US_county.csv",
+        os.path.join(_HERE,"..","data","SVI_2022_US_county.csv"),
+        "data/SVI_2022_US_county.csv",
+    ]]:
         if os.path.exists(p):
-            svi_path = p
-            st.sidebar.success("Found SVI data.")
-            break
-
-    if svi_path is None:
-        st.sidebar.warning(
-            "SVI CSV not found at expected paths.  "
-            "Searched:\n" + "\n".join(f"  {c}" for c in candidates)
-        )
-        # Return a richer fallback than before — still only 3 entries, but
-        # with a clear note so devs know to fix the path.
-        return {
-            'Los Angeles County, CA': {'lat': 34.0522, 'lon': -118.2437, 'vulnerable_count': 523, 'svi_score': 0.95},
-            'Maricopa County, AZ':    {'lat': 33.4484, 'lon': -112.0740, 'vulnerable_count': 456, 'svi_score': 0.89},
-            'King County, WA':        {'lat': 47.6062, 'lon': -122.3321, 'vulnerable_count': 412, 'svi_score': 0.82},
-            'Harris County, TX':      {'lat': 29.7604, 'lon': -95.3698,  'vulnerable_count': 498, 'svi_score': 0.91},
-            'Cook County, IL':        {'lat': 41.8781, 'lon': -87.6298,  'vulnerable_count': 445, 'svi_score': 0.86},
-            'Miami-Dade County, FL':  {'lat': 25.7617, 'lon': -80.1918,  'vulnerable_count': 510, 'svi_score': 0.93},
-        }
-
-    try:
-        svi = pd.read_csv(svi_path)
-        vulnerable = svi[svi['RPL_THEMES'] >= 0.75].copy()
-        st.sidebar.info(f"{len(vulnerable)} high-vulnerability counties found.")
-
-        exact_coords = load_exact_county_coordinates()
-
-        if exact_coords:
-            def get_coords(fips):
-                fips_str = str(int(fips)).zfill(5)
-                return exact_coords.get(fips_str, (39.8283, -98.5795))
-            vulnerable['lat'] = vulnerable['FIPS'].apply(lambda x: get_coords(x)[0])
-            vulnerable['lon'] = vulnerable['FIPS'].apply(lambda x: get_coords(x)[1])
-            st.sidebar.success("Using exact county coordinates.")
-        else:
-            state_coords = load_state_coordinates()
-            def get_state_coords(fips):
-                try:
-                    state_fips = str(int(fips))[:2].zfill(2)
-                    return state_coords.get(state_fips, (39.8283, -98.5795))
-                except Exception:
-                    return (39.8283, -98.5795)
-            vulnerable['lat'] = vulnerable['FIPS'].apply(lambda x: get_state_coords(x)[0])
-            vulnerable['lon'] = vulnerable['FIPS'].apply(lambda x: get_state_coords(x)[1])
-            st.sidebar.info("Using state-level coordinates (county centroids not available).")
-
-        vulnerable_pops = {}
-        for _, row in vulnerable.iterrows():
-            location_key = f"{row['COUNTY']}, {row['STATE']}"
-            vulnerable_pops[location_key] = {
-                'lat': row['lat'],
-                'lon': row['lon'],
-                'vulnerable_count': max(int(row.get('E_AGE65', 0) + row.get('E_POV150', 0) * 0.5), 100),
-                'svi_score': float(row['RPL_THEMES'])
-            }
-
-        df = pd.DataFrame.from_dict(vulnerable_pops, orient='index')
-        df = df.sort_values('svi_score', ascending=False).head(200)
-        st.sidebar.success(f"{len(df)} counties loaded.")
-        return df.to_dict('index')
-
-    except Exception as e:
-        st.sidebar.error(f"Error loading SVI: {e}")
-        return {'Los Angeles County, CA': {'lat': 34.0522, 'lon': -118.2437, 'vulnerable_count': 523, 'svi_score': 0.95}}
-
+            try:
+                svi = pd.read_csv(p)
+                vulnerable = svi[svi['RPL_THEMES']>=0.75].copy()
+                ec = load_exact_county_coordinates()
+                sc = load_state_coordinates()
+                def gc(fips):
+                    if ec:
+                        c=ec.get(str(int(fips)).zfill(5))
+                        if c: return c
+                    try: return sc.get(str(int(fips))[:2].zfill(2),(39.83,-98.58))
+                    except: return (39.83,-98.58)
+                vulnerable['lat']=vulnerable['FIPS'].apply(lambda x:gc(x)[0])
+                vulnerable['lon']=vulnerable['FIPS'].apply(lambda x:gc(x)[1])
+                pops={f"{r['COUNTY']}, {r['STATE']}":{'lat':r['lat'],'lon':r['lon'],
+                      'vulnerable_count':max(int(r.get('E_AGE65',0)+r.get('E_POV150',0)*0.5),100),
+                      'svi_score':float(r['RPL_THEMES'])} for _,r in vulnerable.iterrows()}
+                df=pd.DataFrame.from_dict(pops,orient='index').sort_values('svi_score',ascending=False).head(200)
+                return df.to_dict('index')
+            except Exception as e:
+                st.sidebar.error(f"SVI error: {e}")
+    return {'Los Angeles County, CA':{'lat':34.05,'lon':-118.24,'vulnerable_count':523,'svi_score':0.95},
+            'Harris County, TX':{'lat':29.76,'lon':-95.37,'vulnerable_count':498,'svi_score':0.91},
+            'Miami-Dade County, FL':{'lat':25.76,'lon':-80.19,'vulnerable_count':510,'svi_score':0.93}}
 
 @st.cache_data
 def load_wids_analysis_data():
-    candidates = [
-        os.path.join(_HERE, "..", "..", "..", "01_raw_data", "processed", "fire_events_with_svi_and_delays.csv"),
-        os.path.join(_HERE, "..", "..", "01_raw_data", "processed", "fire_events_with_svi_and_delays.csv"),
-        os.path.join(_HERE, "..", "01_raw_data", "processed", "fire_events_with_svi_and_delays.csv"),
-        os.path.join("01_raw_data", "processed", "fire_events_with_svi_and_delays.csv"),
-    ]
-    candidates = [os.path.realpath(c) for c in candidates]
-    for p in candidates:
+    for p in [os.path.realpath(c) for c in [
+        os.path.join(_HERE,"..","..","..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
+        os.path.join(_HERE,"..","..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
+        os.path.join(_HERE,"..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
+        "01_raw_data/processed/fire_events_with_svi_and_delays.csv",
+    ]]:
         if os.path.exists(p):
-            try:
-                df = pd.read_csv(p)
-                st.sidebar.success(f"Loaded WiDS analysis: {len(df)} fire events.")
-                return df
-            except Exception as e:
-                st.sidebar.warning(f"Could not load WiDS data: {e}")
-                return None
+            try: return pd.read_csv(p)
+            except: pass
     return None
 
+@st.cache_data(ttl=300)
+def load_fire_data():
+    return get_all_us_fires(days=1)
 
-# ══════════════════════════════════════════════════════════════════════
-# HEADER  —  inline SVG logo replaces the broken placeholder image.
-#            Drop a logo.png into src/ and swap this line:
-#              st.image(os.path.join(_HERE, "logo.png"), use_container_width=True)
-# ══════════════════════════════════════════════════════════════════════
-
-LOGO_SVG = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="320" height="90">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e"/>
-      <stop offset="100%" style="stop-color:#16213e"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#e94560"/>
-      <stop offset="100%" style="stop-color:#f5a623"/>
-    </linearGradient>
-  </defs>
-  <!-- background -->
-  <rect width="320" height="90" rx="12" fill="url(#bg)"/>
-  <!-- top accent bar -->
-  <rect y="0" width="320" height="4" rx="2" fill="url(#accent)"/>
-  <!-- flame icon (simplified) -->
-  <g transform="translate(22,18)">
-    <ellipse cx="14" cy="36" rx="10" ry="12" fill="#e94560" opacity="0.9"/>
-    <ellipse cx="14" cy="30" rx="7" ry="10" fill="#f5a623"/>
-    <ellipse cx="14" cy="24" rx="4" ry="6"  fill="#fff" opacity="0.85"/>
-  </g>
-  <!-- primary text -->
-  <text x="54" y="38" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">49ers Intelligence Lab</text>
-  <!-- sub text -->
-  <text x="54" y="60" font-family="Arial, sans-serif" font-size="11" fill="#aaaaaa">Wildfire Caregiver Alert System</text>
-  <!-- WiDS badge -->
-  <rect x="220" y="52" width="78" height="24" rx="12" fill="#e94560" opacity="0.85"/>
-  <text x="259" y="69" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">WiDS 2025</text>
-</svg>
-"""
-
-
-# ══════════════════════════════════════════════════════════════════════
-# PAGE LAYOUT
-# ══════════════════════════════════════════════════════════════════════
-
-# Load data
-vulnerable_populations = load_vulnerable_populations()
-wids_data = load_wids_analysis_data()
-
-# ── sidebar ──────────────────────────────────────────────────────────
-with st.sidebar:
-    # Inline SVG logo — no external image request, always renders
-    st.markdown(LOGO_SVG, unsafe_allow_html=True)
-    st.markdown("---")
-
-    # ── Navigation with visual sections ──
-    
-    # Handle navigation overrides from Start Here page
-    if "nav_override" in st.session_state:
-        page = st.session_state.nav_override
-        del st.session_state.nav_override
-    else:
-        st.markdown("### Navigation")
-        page = st.radio(
-            "",
-            [
-                "🏠 Start Here",
-                "📊 Dashboard",
-                "─────────────",  # Divider
-                "🚨 Evacuation Planner",
-                "🚗 Safe Routes & Transit",
-                "─────────────",  # Divider
-                "📈 Equity Analysis",
-                "🧮 Risk Calculator",
-                "🔮 Impact Projection",
-                "─────────────",  # Divider
-                "ℹ️ About"
-            ],
-            label_visibility="collapsed"
-        )
-        
-        # Map display names to internal page names
-        if page == "─────────────":
-            # If user clicks divider, default to Dashboard
-            page = "Dashboard"
-        elif page == "📊 Dashboard":
-            page = "Dashboard"
-        elif page == "🚨 Evacuation Planner":
-            page = "Evacuation Planner"
-        elif page == "🚗 Safe Routes & Transit":
-            page = "Directions & Navigation"
-        elif page == "📈 Equity Analysis":
-            page = "Equity Analysis"
-        elif page == "🧮 Risk Calculator":
-            page = "Risk Calculator"
-        elif page == "🔮 Impact Projection":
-            page = "Impact Projection"
-        elif page == "ℹ️ About":
-            page = "About"
-        # else page is already set correctly (Start Here)
-
-    st.markdown("---")
-    st.markdown("### Live Fire Data")
-
-    @st.cache_data(ttl=300)
-    def load_fire_data():
-        return get_all_us_fires(days=1)
-
-    try:
-        fire_data = load_fire_data()
-        fire_stats = get_fire_statistics(fire_data)
-        if len(fire_data) > 0:
-            st.metric("Active Fires (24h)", fire_stats['total_fires'])
-            st.metric("Named Fires",        fire_stats['named_fires'])
-            st.metric("Total Acres",        f"{fire_stats['total_acres']:,.0f}")
-        else:
-            st.warning("No active fires")
-            fire_data = pd.DataFrame()
-    except Exception:
-        st.error("Fire data unavailable")
-        fire_data = pd.DataFrame()
-
-    st.markdown("---")
-    st.markdown("### Monitored Areas")
-    st.metric("Vulnerable Counties",  len(vulnerable_populations))
-    total_vuln = sum(loc['vulnerable_count'] for loc in vulnerable_populations.values())
-    st.metric("At-Risk Individuals", f"{total_vuln:,}")
-
-
-# ══════════════════════════════════════════════════════════════════════
-# START HERE (LANDING PAGE)
-# ══════════════════════════════════════════════════════════════════════
-if page == "🏠 Start Here":
-    st.title("🔥 Wildfire Evacuation Decision Support")
-    st.markdown("""
-    ### Reducing Evacuation Delays Through Data Science
-    
-    This system helps **vulnerable populations** and **emergency managers** make faster, 
-    safer evacuation decisions during wildfire events.
-    
-    We focus on communities with:
-    - Limited mobility (elderly, disabled)
-    - Language barriers
-    - No personal vehicle access
-    - Limited internet/phone access
-    """)
-    
-    st.markdown("---")
-    st.subheader("👤 I'm here to...")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        #### 🚨 Evacuate Now
-        **I need to leave immediately**
-        
-        - Find safe evacuation routes
-        - Locate accessible shelters
-        - Get public transit options
-        - Avoid fire zones
-        """)
-        if st.button("🚗 Start Evacuation Planning", use_container_width=True, type="primary"):
-            st.session_state.nav_override = "Evacuation Planner"
-            st.rerun()
-    
+# ── Login ─────────────────────────────────────────────────────────────
+def render_login():
+    col1, col2, col3 = st.columns([1,1.1,1])
     with col2:
-        st.markdown("""
-        #### 📍 Check My Risk
-        **Am I in danger right now?**
-        
-        - See nearby active fires
-        - View my area's vulnerability
-        - Get personalized alerts
-        - Monitor air quality
-        """)
-        if st.button("📊 Open Dashboard", use_container_width=True):
-            st.session_state.nav_override = "Dashboard"
-            st.rerun()
-    
-    with col3:
-        st.markdown("""
-        #### 🔬 Understand the Data
-        **I want to see the research**
-        
-        - Evacuation delay analysis
-        - Equity disparities
-        - Historical fire patterns
-        - Predictive risk models
-        """)
-        if st.button("📈 View Research", use_container_width=True):
-            st.session_state.nav_override = "Equity Analysis"
-            st.rerun()
-    
-    st.markdown("---")
-    st.info("""
-    **💡 New to wildfire preparedness?** Start with the **Dashboard** to see if fires 
-    are currently near you, then use **Evacuation Planner** to map your route.
-    
-    **🎓 Researchers & Emergency Managers:** Skip to **Equity Analysis** or **Impact Projection** 
-    to see how our machine learning models predict evacuation delays.
-    """)
-    
-    # Stats showcase
-    st.markdown("---")
-    st.subheader("📊 Our Impact")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("High-Risk Counties Monitored", "2,847", help="Counties with SVI ≥ 0.75")
-    m2.metric("Transit Options Integrated", "6 Modes", help="Driving, walking, bus, rail, combined, intercity coach")
-    m3.metric("Avg Delay Reduction Target", "23 min", help="Based on Camp Fire 2018 analysis")
-    m4.metric("Languages Supported", "5+", help="English, Spanish, Mandarin, Vietnamese, Tagalog")
-    
-    st.markdown("---")
-    st.caption("""
-    **Data Sources:** CDC Social Vulnerability Index (SVI) 2022, NOAA FIRMS Fire Data, 
-    OpenStreetMap Transit Stops, State DOT Road Closures
-    
-    **Powered By:** UNC Charlotte 49ers Intelligence Lab | WiDS Datathon 2025
-    """)
-
-
-# ══════════════════════════════════════════════════════════════════════
-# DASHBOARD
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Dashboard":
-
-    st.markdown('<h1 class="main-header">Wildfire Caregiver Alert System</h1>', unsafe_allow_html=True)
-    st.markdown("### Reducing Evacuation Delays for Vulnerable Populations Through Data-Driven Alerts")
-
-    st.info(f"Live: {len(fire_data)} fires  ·  {len(vulnerable_populations)} vulnerable counties monitored")
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Caregivers", "2,847", "+127")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Alert Speed", "12 min", "-8 min")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Lives Protected", "5,694", "+358")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Success Rate", "94.2%", "+11%")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    col_map, col_alerts = st.columns([2, 1])
-
-    with col_map:
-        st.subheader("Fires & Vulnerable Populations")
-        m = folium.Map(location=[39.8283, -98.5795], zoom_start=4)
-
-        if len(fire_data) > 0:
-            display_fires = fire_data.nlargest(100, 'acres') if 'acres' in fire_data.columns else fire_data.head(100)
-            for _, fire in display_fires.iterrows():
-                acres  = fire.get('acres', 0)
-                radius = min(max(acres * 50, 20000), 100000)
-                folium.Circle(
-                    location=[fire['latitude'], fire['longitude']],
-                    radius=radius, color='red', fill=True,
-                    fillColor='orange', fillOpacity=0.4,
-                    popup=f"<b>{fire.get('fire_name')}</b><br>{acres:,.0f} acres"
-                ).add_to(m)
-
-            st.caption(f"Fires: {len(display_fires)} of {len(fire_data)}")
-
-            alerts = find_nearby_fires(fire_data, vulnerable_populations, radius_km=80)
-            if alerts:
-                alerted_locations = set(a['Location'] for a in alerts)
-                for loc_name in alerted_locations:
-                    if loc_name in vulnerable_populations:
-                        data = vulnerable_populations[loc_name]
-                        fire_count = sum(1 for a in alerts if a['Location'] == loc_name)
-                        folium.Marker(
-                            location=[data['lat'], data['lon']],
-                            popup=(
-                                f"<b>{loc_name}</b><br>"
-                                f"{data['vulnerable_count']:,} vulnerable<br>"
-                                f"SVI: {data.get('svi_score', 0):.2f}<br>"
-                                f"{fire_count} fires nearby"
-                            ),
-                            icon=folium.Icon(color='blue', icon='users', prefix='fa'),
-                            tooltip=f"{fire_count} fires within 50 mi"
-                        ).add_to(m)
-                st.caption(f"Showing {len(alerted_locations)} counties with fires nearby (within 50 miles)")
+        b64 = get_logo_b64()
+        if b64:
+            st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem;">'
+                        f'<img src="data:image/png;base64,{b64}" width="280" '
+                        f'style="border-radius:12px;"/></div>', unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align:center;color:#f5a623;'>Wildfire Evacuation Alert System</h2>",
+                    unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;color:#aaa;margin-bottom:1.5rem;'>"
+                    "49ers Intelligence Lab  ·  WiDS Datathon 2025</p>", unsafe_allow_html=True)
+        st.divider()
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Sign In", use_container_width=True, type="primary"):
+            if username in CREDENTIALS and CREDENTIALS[username]["password"] == password:
+                st.session_state.logged_in    = True
+                st.session_state.username     = username
+                st.session_state.role         = CREDENTIALS[username]["role"]
+                st.session_state.role_display = CREDENTIALS[username]["display"]
+                st.session_state.chat_messages = []
+                st.session_state.page = {"emergency_worker":"Command Dashboard",
+                                         "evacuee":"Start Here","analyst":"Dashboard"}[st.session_state.role]
+                st.rerun()
             else:
-                st.caption("No vulnerable counties with nearby fires.")
+                st.error("Invalid credentials.")
+        st.divider()
+        st.caption("Demo credentials:")
+        st.caption("Emergency Worker:  `dispatcher` / `fire2025`")
+        st.caption("Caregiver/Evacuee: `caregiver` / `evacuate`")
+        st.caption("Data Analyst:      `analyst` / `datathon`")
+
+# ── AI Assistant ──────────────────────────────────────────────────────
+def render_chatbot(role):
+    labels = {"emergency_worker":"EVAC-OPS  |  Command & Dispatch Assistant",
+              "evacuee":"SAFE-PATH  |  Evacuation Guidance & Caregiver Support",
+              "analyst":"DATA-LAB  |  Technical & Research Assistant"}
+    placeholders = {"emergency_worker":"Enter command or query...",
+                    "evacuee":"Ask anything about evacuating safely...",
+                    "analyst":"Ask a technical question about the project..."}
+    quick_prompts = {
+        "emergency_worker":["Vulnerable populations in Zone A","Draft a SITREP for active fire",
+                            "Resources near fire perimeter","Flag PRIORITY RED individuals"],
+        "evacuee":["I need to evacuate right now — what do I do?","How do I evacuate with someone on oxygen?",
+                   "What should I pack in my go-bag?","Where is the nearest accessible shelter?"],
+        "analyst":["Explain the Cox survival analysis model","How should I interpret RPL_THEMES in SVI?",
+                   "How can the USFA registry improve the model?","Suggest improvements to the alert classifier"],
+    }
+    color = ROLE_COLORS[role]
+    st.markdown(f"<h2 style='color:{color}'>AI Assistant</h2>", unsafe_allow_html=True)
+    st.caption(labels[role])
+    st.divider()
+    st.markdown("**Quick prompts:**")
+    cols = st.columns(2)
+    for i, qp in enumerate(quick_prompts[role]):
+        if cols[i%2].button(qp, key=f"qp_{i}", use_container_width=True):
+            st.session_state.chat_messages.append({"role":"user","content":qp})
+            st.rerun()
+    st.divider()
+    for msg in st.session_state.chat_messages:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+    msgs = st.session_state.chat_messages
+    if msgs and msgs[-1]["role"]=="user" and (len(msgs)==1 or msgs[-2]["role"]!="user"):
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                    response = client.messages.create(model="claude-sonnet-4-6", max_tokens=1024,
+                                                      system=SYSTEM_PROMPTS[role],
+                                                      messages=st.session_state.chat_messages)
+                    reply = response.content[0].text
+                except Exception as e:
+                    reply = f"API error: {e}"
+            st.write(reply)
+        st.session_state.chat_messages.append({"role":"assistant","content":reply})
+        st.rerun()
+    if prompt := st.chat_input(placeholders[role]):
+        st.session_state.chat_messages.append({"role":"user","content":prompt})
+        st.rerun()
+    if st.session_state.chat_messages:
+        if st.button("Clear conversation", key="clear_chat"):
+            st.session_state.chat_messages = []
+            st.rerun()
+
+# ── Command Dashboard ────────────────────────────────────────────────
+def render_command_dashboard(fire_data, vulnerable_populations, usfa_data):
+    st.markdown('<h1 class="main-header">Command Dashboard</h1>', unsafe_allow_html=True)
+    try: fire_stats = get_fire_statistics(fire_data)
+    except: fire_stats = {'total_fires':0,'named_fires':0,'total_acres':0}
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Active Fires (24h)", fire_stats.get('total_fires',0))
+    c2.metric("Named Fires",        fire_stats.get('named_fires',0))
+    c3.metric("Total Acres",        f"{fire_stats.get('total_acres',0):,.0f}")
+    c4.metric("Counties at Risk",   len(vulnerable_populations))
+    st.divider()
+
+    col_map, col_alerts = st.columns([2,1])
+    with col_map:
+        st.subheader("Active Fires & Vulnerable Populations")
+        if GEO_MAP_AVAILABLE:
+            render_map_with_controls(vulnerable_populations, fire_data, height=460)
         else:
-            st.info("No active fires to display.")
-
-        st_folium(m, width=700, height=500)
-
+            m = folium.Map(location=[39.83,-98.58], zoom_start=4)
+            if len(fire_data) > 0:
+                df = fire_data.nlargest(100,'acres') if 'acres' in fire_data.columns else fire_data.head(100)
+                for _,fire in df.iterrows():
+                    acres = fire.get('acres',0)
+                    folium.Circle(location=[fire['latitude'],fire['longitude']],
+                        radius=min(max(acres*50,20000),100000),color='red',fill=True,
+                        fillColor='orange',fillOpacity=0.4,
+                        popup=f"<b>{fire.get('fire_name','Unknown')}</b><br>{acres:,.0f} acres").add_to(m)
+            st_folium(m, width=None, height=460)
     with col_alerts:
         st.subheader("Proximity Alerts")
         if len(fire_data) > 0:
             alerts = find_nearby_fires(fire_data, vulnerable_populations, radius_km=80)
             if alerts:
-                df_alerts = pd.DataFrame(alerts)[['Location', 'Fire_Name', 'Distance_mi', 'Fire_Acres']].head(20)
-                df_alerts.columns = ['Location', 'Fire', 'Dist (mi)', 'Acres']
-                st.warning(f"{len(alerts)} ALERTS")
-                st.dataframe(df_alerts, hide_index=True)
-                if len(alerts) > 20:
-                    st.caption(f"Top 20 of {len(alerts)} alerts")
-
-                if EVACUATION_AVAILABLE and len(alerts) > 0:
-                    st.markdown("---")
-                    st.subheader("Evacuation Routes")
-                    if OSM_ROUTING_AVAILABLE:
-                        st.caption("Using OpenStreetMap real road routing")
-                    else:
-                        st.caption("Using estimated routes (straight-line + highways)")
-                    try:
-                        evac_plans = generate_evacuation_routes_for_alerts(
-                            fire_data, vulnerable_populations, alerts[:5]
-                        )
-                        for plan in evac_plans:
-                            urgency_label = {"HIGH": "[HIGH]", "MEDIUM": "[MED]", "LOW": "[LOW]"}.get(plan['urgency'], "")
-                            highway_dist  = plan.get('highway_distance_mi')
-                            highway_str   = f"{highway_dist:.1f} mi" if highway_dist else "N/A"
-                            safe_zone_dist= plan.get('safe_zone_distance_mi')
-                            safe_zone_str = f"{safe_zone_dist:.1f} mi" if safe_zone_dist else "N/A"
-
-                            with st.expander(f"{urgency_label} {plan['location'][:30]}", expanded=(plan['urgency']=='HIGH')):
-                                st.markdown(
-                                    f"**Fire:** {plan['fire_name']}  \n"
-                                    f"**Distance:** {plan['fire_distance_mi']:.1f} mi  |  **Urgency:** {plan['urgency']}\n\n"
-                                    f"Evacuate: {plan['evacuation_direction']}  \n"
-                                    f"Highway: {plan['nearest_highway']} ({highway_str})  \n"
-                                    f"Safe Zone: {plan['safe_zone']} ({safe_zone_str})  \n"
-                                    f"Total: ~{plan['total_distance_mi']:.0f} mi"
-                                )
-                    except Exception as e:
-                        st.error(f"Route calculation error: {e}")
+                df_a = pd.DataFrame(alerts)[['Location','Fire_Name','Distance_mi','Fire_Acres']].head(15)
+                df_a.columns = ['Location','Fire','Dist (mi)','Acres']
+                st.warning(f"{len(alerts)} ACTIVE ALERTS")
+                st.dataframe(df_a, hide_index=True, use_container_width=True)
             else:
-                st.success("No alerts.")
+                st.success("No proximity alerts.")
+        st.divider()
+        st.markdown("**Emergency Contacts**")
+        st.info("Fire: (704) 555-0100\nEvacuation: (704) 555-0200\n911: Emergency")
 
-        st.markdown("---")
-        st.subheader("Emergency")
-        st.info("**Fire:** (704) 555-0100\n**Evacuation:** (704) 555-0200\n**911:** Emergency")
+    st.divider()
+    st.subheader("Fire Department Resources  (USFA National Registry)")
 
+    if usfa_data is not None and len(usfa_data) > 0:
+        f1,f2,f3 = st.columns(3)
+        states = sorted(usfa_data['HQ state'].dropna().unique()) if 'HQ state' in usfa_data.columns else []
+        with f1: sel_state = st.selectbox("Filter by State",["All"]+list(states),key="usfa_state")
+        with f2: sel_type  = st.selectbox("Department Type",["All","Career","Volunteer","Combination"],key="usfa_type")
+        with f3: primary   = st.checkbox("Primary Emergency Mgmt Only",key="usfa_primary")
 
-# ══════════════════════════════════════════════════════════════════════
-# EVACUATION PLANNER
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Evacuation Planner":
-    st.info("🚨 **You are in:** Evacuation Planning Mode | Finding safe routes and accessible shelters for vulnerable populations")
-    
-    if PLANNER_AVAILABLE:
-        render_evacuation_planner_page(fire_data, vulnerable_populations)
+        filt = usfa_data.copy()
+        if sel_state!="All" and 'HQ state' in filt.columns:
+            filt=filt[filt['HQ state'].str.strip()==sel_state]
+        if sel_type!="All" and 'Dept Type' in filt.columns:
+            filt=filt[filt['Dept Type'].str.contains(sel_type,case=False,na=False)]
+        if primary and 'Primary agency for emergency mgmt' in filt.columns:
+            filt=filt[filt['Primary agency for emergency mgmt'].str.strip().str.lower()=='yes']
+
+        st.caption(f"Showing {len(filt):,} of {len(usfa_data):,} departments")
+        m1,m2,m3,m4 = st.columns(4)
+        if 'Number Of Stations' in filt.columns:           m1.metric("Total Stations",f"{filt['Number Of Stations'].sum():,}")
+        if 'Active Firefighters - Career' in filt.columns:    m2.metric("Career FF",f"{filt['Active Firefighters - Career'].sum():,}")
+        if 'Active Firefighters - Volunteer' in filt.columns: m3.metric("Volunteer FF",f"{filt['Active Firefighters - Volunteer'].sum():,}")
+        if 'Primary agency for emergency mgmt' in filt.columns:
+            m4.metric("Primary Mgmt Agencies",f"{(filt['Primary agency for emergency mgmt'].str.strip().str.lower()=='yes').sum():,}")
+
+        st.divider()
+        if 'Dept Type' in filt.columns and len(filt)>0:
+            ch1,ch2 = st.columns(2)
+            with ch1:
+                tc=filt['Dept Type'].value_counts().reset_index(); tc.columns=['Type','Count']
+                fig=px.bar(tc,x='Type',y='Count',title="Departments by Type",color='Count',color_continuous_scale='Reds')
+                fig.update_layout(height=300,showlegend=False)
+                st.plotly_chart(fig,use_container_width=True)
+            with ch2:
+                if 'HQ state' in filt.columns:
+                    sc=filt['HQ state'].value_counts().head(10).reset_index(); sc.columns=['State','Departments']
+                    fig2=px.bar(sc,x='State',y='Departments',title="Top 10 States",color='Departments',color_continuous_scale='Oranges')
+                    fig2.update_layout(height=300,showlegend=False)
+                    st.plotly_chart(fig2,use_container_width=True)
+
+        dcols=[c for c in ['Fire dept name','HQ city','HQ state','County','Dept Type',
+               'Number Of Stations','Active Firefighters - Career','Active Firefighters - Volunteer',
+               'Primary agency for emergency mgmt'] if c in filt.columns]
+        st.dataframe(filt[dcols].head(200).reset_index(drop=True),use_container_width=True,hide_index=True)
+        if len(filt)>200: st.caption(f"Showing top 200 of {len(filt):,}. Use filters to narrow down.")
     else:
-        st.error("Evacuation Planner module not available.  Ensure evacuation_planner_page.py is in src/.")
+        st.warning("USFA registry not found. Place `usfa-registry-national.csv` in the `src/` folder.")
+        mock=pd.DataFrame({'Department':['Charlotte FD','Mecklenburg Co. Fire','Cabarrus FD','Gaston Co. Fire'],
+            'Type':['Career','Combination','Career','Volunteer'],'Stations':[42,18,12,8],
+            'Career FF':[890,145,220,0],'Volunteer FF':[0,80,0,95],
+            'Status':['Available','Deployed','Available','Available']})
+        st.dataframe(mock,use_container_width=True,hide_index=True)
 
+    st.divider()
+    st.subheader("High-Priority Vulnerable Populations")
+    vp_df=pd.DataFrame.from_dict(vulnerable_populations,orient='index').reset_index()
+    vp_df.columns=['Location','Lat','Lon','Vulnerable Count','SVI Score']
+    vp_df=vp_df.sort_values('SVI Score',ascending=False).head(20)
+    vp_df['SVI Score']=vp_df['SVI Score'].round(3)
+    st.dataframe(vp_df[['Location','Vulnerable Count','SVI Score']],use_container_width=True,hide_index=True)
 
-# ══════════════════════════════════════════════════════════════════════
-# DIRECTIONS & NAVIGATION
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Directions & Navigation":
-    st.info("🚗 **Fire-Aware Routing** | Unlike Google Maps, this shows routes that avoid active fire zones and includes accessible public transit options")
-    
-    if DIRECTIONS_AVAILABLE:
-        render_directions_page(fire_data, vulnerable_populations)
-    else:
-        st.error("Directions module not available.  Ensure directions_page.py is in src/.")
+# ── Main app ──────────────────────────────────────────────────────────
+def render_app():
+    role=st.session_state.role; role_display=st.session_state.role_display
+    allowed_pages=ROLE_PAGES[role]; color=ROLE_COLORS[role]
+    vulnerable_populations=load_vulnerable_populations()
+    wids_data=load_wids_analysis_data(); usfa_data=load_usfa_data()
+    try: fire_data=load_fire_data(); fire_stats=get_fire_statistics(fire_data)
+    except: fire_data=pd.DataFrame(); fire_stats={'total_fires':0,'named_fires':0,'total_acres':0}
 
+    with st.sidebar:
+        render_logo(width=90, shape="circle")
+        st.markdown(f"<div style='text-align:center;color:{color};font-weight:bold;'>{role_display}</div>",
+                    unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center;color:#aaa;font-size:0.85rem;margin-bottom:0.8rem;'>"
+                    f"{st.session_state.username}</div>", unsafe_allow_html=True)
+        st.divider()
+        if "page" not in st.session_state or st.session_state.page not in allowed_pages:
+            st.session_state.page=allowed_pages[0]
+        selected=st.radio("Navigation",allowed_pages,index=allowed_pages.index(st.session_state.page),
+                          label_visibility="collapsed")
+        if selected!=st.session_state.page: st.session_state.page=selected; st.rerun()
+        page=st.session_state.page
+        st.divider()
+        st.markdown("**Live Fire Data**")
+        if len(fire_data)>0:
+            st.metric("Active Fires (24h)",fire_stats.get('total_fires',0))
+            st.metric("Total Acres",f"{fire_stats.get('total_acres',0):,.0f}")
+        else: st.caption("No active fires")
+        st.divider()
+        total_vuln=sum(l['vulnerable_count'] for l in vulnerable_populations.values())
+        st.metric("Vulnerable Counties",len(vulnerable_populations))
+        st.metric("At-Risk Individuals",f"{total_vuln:,}")
+        st.divider()
+        if st.button("Sign Out",use_container_width=True):
+            for k in list(st.session_state.keys()): del st.session_state[k]
+            st.rerun()
 
-# ══════════════════════════════════════════════════════════════════════
-# EQUITY ANALYSIS
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Equity Analysis":
-    st.info("📊 **Research Mode** | Analysis of evacuation delays by community vulnerability (CDC SVI) — Understanding who gets left behind")
-    
-    if wids_data is not None:
-        st.success(f"Using WiDS Analysis Data ({len(wids_data)} events)")
-        if 'evacuation_delay_hours' in wids_data.columns:
-            st.subheader("Actual Evacuation Delays from WiDS Dataset")
-            fig = px.histogram(wids_data, x='evacuation_delay_hours', nbins=50,
-                               title="Distribution of Evacuation Delays")
-            st.plotly_chart(fig)
-            st.metric("Mean Delay",   f"{wids_data['evacuation_delay_hours'].mean():.2f} hours")
-            st.metric("Median Delay", f"{wids_data['evacuation_delay_hours'].median():.2f} hours")
-    else:
-        st.info("Using simulated data (WiDS dataset not loaded).")
+    page=st.session_state.page
 
-    st.header("Evacuation Equity Analysis")
-
-    np.random.seed(42)
-    vulnerable_delays     = np.random.gamma(3, 2, 1000)
-    non_vulnerable_delays = np.random.gamma(2, 1.5, 1000)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Time Distribution")
-        fig = go.Figure()
-        fig.add_trace(go.Histogram(x=vulnerable_delays,     name='Vulnerable',     marker_color='#FF4B4B', opacity=0.7))
-        fig.add_trace(go.Histogram(x=non_vulnerable_delays, name='Non-Vulnerable', marker_color='#4B4BFF', opacity=0.7))
-        fig.update_layout(barmode='overlay', xaxis_title='Hours', yaxis_title='Frequency', height=400)
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        st.subheader("Statistics")
-        vuln_mean     = vulnerable_delays.mean()
-        non_vuln_mean = non_vulnerable_delays.mean()
-        diff          = vuln_mean - non_vuln_mean
-        st.metric("Vulnerable Avg",     f"{vuln_mean:.2f}h")
-        st.metric("Non-Vulnerable Avg", f"{non_vuln_mean:.2f}h")
-        st.metric("Disparity",          f"{diff:.2f}h", delta=f"{diff/non_vuln_mean*100:.1f}%", delta_color="inverse")
-
-
-# ══════════════════════════════════════════════════════════════════════
-# RISK CALCULATOR
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Risk Calculator":
-    st.info("🧮 **Risk Assessment Tool** | Calculate your county's evacuation delay risk based on vulnerability factors")
-    st.header("Risk Calculator")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Input")
-        distance   = st.slider("Distance to fire (mi)", 0, 50, 15)
-        age        = st.number_input("Age", 0, 120, 72)
-        mobility   = st.checkbox("Mobility issues")
-        chronic    = st.checkbox("Chronic illness")
-        low_income = st.checkbox("Low income")
-        alone      = st.checkbox("Lives alone")
-        no_vehicle = st.checkbox("No vehicle")
-    with col2:
-        st.subheader("Result")
-        score  = max(0, (age - 65) / 35 * 30)
-        score += 20 if mobility   else 0
-        score += 15 if chronic    else 0
-        score += 10 if low_income else 0
-        score += 10 if alone      else 0
-        score += 10 if no_vehicle else 0
-        score += max(0, (50 - distance) / 50 * 30)
-        score  = min(100, score)
-
-        if score >= 70:
-            st.markdown(f'<div class="risk-high">HIGH RISK<br>Score: {score:.0f}/100</div>', unsafe_allow_html=True)
-        elif score >= 40:
-            st.markdown(f'<div class="risk-medium">MEDIUM RISK<br>Score: {score:.0f}/100</div>', unsafe_allow_html=True)
+    if   page=="Command Dashboard": render_command_dashboard(fire_data, vulnerable_populations, usfa_data)
+    elif page=="Start Here":
+        st.title("Wildfire Evacuation Decision Support")
+        st.markdown("### Reducing Evacuation Delays Through Data Science")
+        st.divider()
+        c1,c2,c3=st.columns(3)
+        with c1:
+            st.markdown("**Evacuate Now**\n\nFind safe routes and accessible shelters.")
+            if st.button("Start Evacuation Planning",use_container_width=True,type="primary"):
+                st.session_state.page="Evacuation Planner"; st.rerun()
+        with c2:
+            st.markdown("**Get Personalized Help**\n\nAsk the AI assistant about your situation.")
+            if st.button("Open AI Assistant",use_container_width=True):
+                st.session_state.page="AI Assistant"; st.rerun()
+        with c3:
+            st.markdown("**Safe Routes**\n\nFire-aware routing avoiding active zones.")
+            if st.button("View Safe Routes",use_container_width=True):
+                st.session_state.page="Safe Routes & Transit"; st.rerun()
+        st.divider()
+        m1,m2,m3,m4=st.columns(4)
+        m1.metric("High-Risk Counties","2,847"); m2.metric("Transit Modes","6")
+        m3.metric("Avg Delay Reduction","23 min"); m4.metric("Languages Supported","5+")
+    elif page=="Dashboard":
+        st.markdown('<h1 class="main-header">Wildfire Caregiver Alert System</h1>',unsafe_allow_html=True)
+        st.info(f"Live: {len(fire_data)} fires  ·  {len(vulnerable_populations)} counties monitored")
+        c1,c2,c3,c4=st.columns(4)
+        c1.metric("Caregivers","2,847","+127"); c2.metric("Alert Speed","12 min","-8 min")
+        c3.metric("Lives Protected","5,694","+358"); c4.metric("Success Rate","94.2%","+11%")
+        st.divider()
+        if GEO_MAP_AVAILABLE:
+            render_map_with_controls(vulnerable_populations, fire_data, height=500)
         else:
-            st.markdown(f'<div class="risk-low">LOW RISK<br>Score: {score:.0f}/100</div>', unsafe_allow_html=True)
+            m=folium.Map(location=[39.83,-98.58],zoom_start=4)
+            if len(fire_data)>0:
+                df=fire_data.nlargest(100,'acres') if 'acres' in fire_data.columns else fire_data.head(100)
+                for _,fire in df.iterrows():
+                    acres=fire.get('acres',0)
+                    folium.Circle(location=[fire['latitude'],fire['longitude']],
+                        radius=min(max(acres*50,20000),100000),color='red',fill=True,
+                        fillColor='orange',fillOpacity=0.4,
+                        popup=f"<b>{fire.get('fire_name','Unknown')}</b><br>{acres:,.0f} acres").add_to(m)
+            st_folium(m,width=None,height=500)
+    elif page=="Evacuation Planner":
+        if PLANNER_AVAILABLE: render_evacuation_planner_page(fire_data, vulnerable_populations)
+        else: st.error("Ensure evacuation_planner_page.py is in src/.")
+    elif page=="Safe Routes & Transit":
+        if DIRECTIONS_AVAILABLE: render_directions_page(fire_data, vulnerable_populations)
+        else: st.error("Ensure directions_page.py is in src/.")
+    elif page=="Equity Analysis":
+        st.header("Evacuation Equity Analysis")
+        st.info("Analysis of evacuation delays by community vulnerability (CDC SVI)")
+        if wids_data is not None and 'evacuation_delay_hours' in wids_data.columns:
+            fig=px.histogram(wids_data,x='evacuation_delay_hours',nbins=50,title="Distribution of Evacuation Delays")
+            st.plotly_chart(fig)
+        np.random.seed(42)
+        vd=np.random.gamma(3,2,1000); nvd=np.random.gamma(2,1.5,1000)
+        col1,col2=st.columns(2)
+        with col1:
+            fig=go.Figure()
+            fig.add_trace(go.Histogram(x=vd,name='Vulnerable',marker_color='#FF4B4B',opacity=0.7))
+            fig.add_trace(go.Histogram(x=nvd,name='Non-Vulnerable',marker_color='#4B4BFF',opacity=0.7))
+            fig.update_layout(barmode='overlay',xaxis_title='Hours',height=400)
+            st.plotly_chart(fig,use_container_width=True)
+        with col2:
+            diff=vd.mean()-nvd.mean()
+            st.metric("Vulnerable Avg",f"{vd.mean():.2f}h")
+            st.metric("Non-Vulnerable Avg",f"{nvd.mean():.2f}h")
+            st.metric("Disparity",f"{diff:.2f}h",delta=f"{diff/nvd.mean()*100:.1f}%",delta_color="inverse")
+    elif page=="Risk Calculator":
+        st.header("Evacuation Risk Calculator")
+        col1,col2=st.columns(2)
+        with col1:
+            distance=st.slider("Distance to fire (mi)",0,50,15); age=st.number_input("Age",0,120,72)
+            mobility=st.checkbox("Mobility issues"); chronic=st.checkbox("Chronic illness")
+            low_income=st.checkbox("Low income"); alone=st.checkbox("Lives alone")
+            no_vehicle=st.checkbox("No vehicle")
+        with col2:
+            score=max(0,(age-65)/35*30)
+            score+=20 if mobility else 0; score+=15 if chronic else 0
+            score+=10 if low_income else 0; score+=10 if alone else 0
+            score+=10 if no_vehicle else 0; score+=max(0,(50-distance)/50*30)
+            score=min(100,score)
+            if score>=70:   st.markdown(f'<div class="risk-high">HIGH RISK — Score: {score:.0f}/100</div>',unsafe_allow_html=True)
+            elif score>=40: st.markdown(f'<div class="risk-medium">MEDIUM RISK — Score: {score:.0f}/100</div>',unsafe_allow_html=True)
+            else:           st.markdown(f'<div class="risk-low">LOW RISK — Score: {score:.0f}/100</div>',unsafe_allow_html=True)
+    elif page=="Impact Projection":
+        st.header("Projected Impact of Caregiver Alert System")
+        c1,c2,c3=st.columns(3)
+        with c1: time_reduction=st.slider("Avg Time Reduction (hours)",0.5,5.0,2.0,0.5)
+        with c2: adoption_rate=st.slider("Caregiver Adoption Rate (%)",10,100,65,5)
+        with c3: population_size=st.number_input("Vulnerable Population Size",1000,100000,10000,1000)
+        curr_crit=0.45; red_crit=max(0,curr_crit-(time_reduction/6.8)*curr_crit)
+        lives=int(population_size*(adoption_rate/100)*(curr_crit-red_crit))
+        st.divider()
+        c1,c2,c3,c4=st.columns(4)
+        c1.metric("Lives Protected",f"{lives:,}")
+        c2.metric("Avg Evacuation Time",f"{max(0,6.8-time_reduction):.1f}h",delta=f"-{time_reduction:.1f}h",delta_color="inverse")
+        c3.metric("In Critical Zone",f"{red_crit*100:.0f}%",delta_color="inverse")
+        c4.metric("System Efficiency",f"{adoption_rate}%")
+        np.random.seed(42)
+        cd=np.random.gamma(3,2.3,population_size)
+        rd=np.maximum(0,cd-time_reduction*(adoption_rate/100))
+        fig=go.Figure()
+        fig.add_trace(go.Histogram(x=cd,name='Current',marker_color='#FF4B4B',opacity=0.6,nbinsx=40))
+        fig.add_trace(go.Histogram(x=rd,name='With Caregiver Alerts',marker_color='#00CC00',opacity=0.6,nbinsx=40))
+        fig.add_vline(x=6.0,line_dash="dash",line_color="black",annotation_text="Critical Threshold (6h)")
+        fig.update_layout(barmode='overlay',xaxis_title='Evacuation Delay (hours)',height=450)
+        st.plotly_chart(fig,use_container_width=True)
+    elif page=="AI Assistant": render_chatbot(role)
+    elif page=="About":
+        st.header("About the Caregiver Alert System")
+        st.markdown(f"""
+### The Problem
+Vulnerable populations face **67% longer** average evacuation times during wildfires,
+with **45%** exceeding critical evacuation thresholds.
 
+### Technology Stack
+- Data Analysis: Python, pandas, scikit-learn, geopandas
+- Visualization: Streamlit, Plotly, Folium
+- Routing: OSRM (open-source)
+- Vulnerability Data: CDC Social Vulnerability Index 2022
+- Fire Department Resources: USFA National Registry
+- Fire Data: NASA FIRMS + NIFC APIs
+- AI Assistant: Anthropic Claude API
 
-# ══════════════════════════════════════════════════════════════════════
-# IMPACT PROJECTION
-# ══════════════════════════════════════════════════════════════════════
-elif page == "Impact Projection":
-    st.info("🔮 **Predictive Analytics** | Machine learning models forecasting evacuation delays — What if Paradise had this tool in 2018?")
-    st.info("Data Source: WiDS Datathon 2025 Competition Dataset (Impact Modeling)")
-    st.header("Projected Impact of Caregiver Alert System")
+### Team: 49ers Intelligence Lab
+WiDS Datathon 2025  ·  UNC Charlotte  
+Currently monitoring **{len(vulnerable_populations)} vulnerable counties**.
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        time_reduction  = st.slider("Avg Time Reduction (hours)", 0.5, 5.0, 2.0, 0.5)
-    with col2:
-        adoption_rate   = st.slider("Caregiver Adoption Rate (%)", 10, 100, 65, 5)
-    with col3:
-        population_size = st.number_input("Vulnerable Population Size", 1000, 100000, 10000, 1000)
-
-    current_avg_delay      = 6.8
-    reduced_avg_delay      = max(0, current_avg_delay - time_reduction)
-    critical_threshold     = 6.0
-    current_critical_pct   = 0.45
-    reduced_critical_pct   = max(0, current_critical_pct - (time_reduction / current_avg_delay) * current_critical_pct)
-    lives_protected        = int(population_size * (adoption_rate / 100) * (current_critical_pct - reduced_critical_pct))
+**Contact:** layesh1@charlotte.edu  
+**GitHub:** https://github.com/layesh1/widsdatathon  
+**WiDS Conference:** April 21–22, 2026
+        """)
 
     st.markdown("---")
-    st.subheader("Projected Outcomes")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Lives Protected",    f"{lives_protected:,}",          delta=f"{lives_protected/population_size*100:.1f}% of population")
-    c2.metric("Avg Evacuation Time",f"{reduced_avg_delay:.1f}h",     delta=f"-{time_reduction:.1f}h",  delta_color="inverse")
-    c3.metric("In Critical Zone",   f"{reduced_critical_pct*100:.0f}%", delta=f"-{(current_critical_pct-reduced_critical_pct)*100:.0f}%", delta_color="inverse")
-    c4.metric("System Efficiency",  f"{adoption_rate}%",             delta="Target: 80%")
+    st.markdown(f"<div style='text-align:center;color:gray;'>49ers Intelligence Lab  ·  WiDS 2025  ·  "
+                f"{len(vulnerable_populations)} counties  ·  {len(fire_data)} active fires</div>",
+                unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.subheader("Evacuation Time Distribution: Current vs. With Caregiver Alerts")
+# ── Entry point ───────────────────────────────────────────────────────
+def main():
+    if "logged_in" not in st.session_state: st.session_state.logged_in=False
+    if not st.session_state.logged_in: render_login()
+    else: render_app()
 
-    np.random.seed(42)
-    current_delays = np.random.gamma(3, 2.3, population_size)
-    reduced_delays = np.maximum(0, current_delays - time_reduction * (adoption_rate / 100))
-
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(x=current_delays, name='Current System',                          marker_color='#FF4B4B', opacity=0.6, nbinsx=40))
-    fig.add_trace(go.Histogram(x=reduced_delays, name=f'With Caregiver Alerts (-{time_reduction}h)', marker_color='#00CC00', opacity=0.6, nbinsx=40))
-    fig.add_vline(x=critical_threshold, line_dash="dash", line_color="black", annotation_text="Critical Threshold (6h)")
-    fig.update_layout(barmode='overlay', xaxis_title='Evacuation Delay (hours)', yaxis_title='Number of Individuals', height=500)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("---")
-    st.subheader("Geographic Impact Analysis")
-    counties_data = pd.DataFrame({
-        'County':            ['Mecklenburg', 'Cabarrus', 'Union', 'Gaston', 'Iredell'],
-        'Vulnerable Pop.':   [3420, 1876, 2145, 1598, 1234],
-        'Current Avg Delay': [6.9, 7.2, 6.5, 6.8, 7.1],
-        'Projected Delay':   [4.9, 5.2, 4.5, 4.8, 5.1],
-        'Lives Protected':   [542, 298, 340, 253, 196],
-    })
-    fig = px.bar(counties_data, x='County', y=['Current Avg Delay', 'Projected Delay'],
-                 barmode='group',
-                 color_discrete_map={'Current Avg Delay': '#FF4B4B', 'Projected Delay': '#00CC00'},
-                 labels={'value': 'Hours', 'variable': 'Scenario'})
-    fig.update_layout(height=400)
-    st.plotly_chart(fig, use_container_width=True)
-    st.dataframe(counties_data, use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════════════════════════════════════════
-# ABOUT
-# ══════════════════════════════════════════════════════════════════════
-elif page == "About":
-    st.header("About the Caregiver Alert System")
-    st.markdown(f"""
-    ### The Problem
-
-    Vulnerable populations — including elderly, disabled, and low-income individuals — face **significantly longer
-    evacuation delays** during wildfires.  Our analysis reveals:
-
-    - **67% longer** average evacuation times for vulnerable populations
-    - **45% of vulnerable individuals** exceed critical evacuation thresholds
-    - **Disproportionate impact** on rural and low-income communities
-
-    ### Our Solution
-
-    The **Caregiver Alert System** creates a parallel notification pathway that alerts family members
-    and caregivers when wildfires threaten their vulnerable loved ones.
-
-    #### Personalized Risk Assessment
-    - Real-time risk scores based on fire proximity + individual vulnerability factors
-    - Predictive evacuation windows using machine learning
-    - Addresses individual mobility, health, and resource constraints
-
-    #### Proactive Alerts
-    - Immediate notifications to pre-registered caregivers
-    - Multi-channel delivery (SMS, email, phone)
-    - Escalating urgency based on fire progression
-
-    #### Data-Driven Equity Focus
-    - Built on comprehensive Social Vulnerability Index (SVI) analysis
-    - Prioritises historically underserved communities
-    - Continuous monitoring of evacuation disparities
-
-    #### Actionable Guidance
-    - Fire perimeter visualisation
-    - Optimised evacuation routes (OSRM open-source routing)
-    - Categorised shelter locations (women, elderly, disabled, mental health, veterans, pets)
-    - Emergency preparation checklists
-
-    ### Technology Stack
-
-    - **Data Analysis:** Python (pandas, scikit-learn, geopandas)
-    - **Visualisation:** Streamlit, Plotly, Folium (Leaflet.js)
-    - **Routing:** OSRM (open-source, no API key)
-    - **Geocoding:** Nominatim / OpenStreetMap
-    - **Shelter Discovery:** OpenStreetMap Overpass API
-    - **Road Conditions:** NC DOT TIMS REST API (live, no key)
-    - **Real-time Fire Data:** NASA FIRMS + NIFC APIs
-    - **Vulnerability Data:** CDC Social Vulnerability Index (SVI) 2022
-
-    ### Team: 49ers Intelligence Lab
-
-    WiDS Datathon 2025 participants from UNC Charlotte.
-
-    Currently monitoring **{len(vulnerable_populations)} vulnerable counties**.
-
-    ### Contact
-    - Email: layesh1@charlotte.edu
-    - GitHub: https://github.com/layesh1/widsdatathon
-    - WiDS Conference: April 21–22, 2026
-    """)
-    st.info("Dashboard page shows real-time fire data.  Analysis pages use WiDS competition dataset.")
-
-
-# ── footer ───────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown(f"""
-<div style='text-align: center; color: gray;'>
-    <p>49ers Intelligence Lab  ·  WiDS 2025  ·  {len(vulnerable_populations)} counties  ·  {len(fire_data)} fires</p>
-</div>
-""", unsafe_allow_html=True)
+if __name__=="__main__": main()
