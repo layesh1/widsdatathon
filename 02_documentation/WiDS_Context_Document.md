@@ -218,10 +218,6 @@ pip3 install streamlit anthropic folium streamlit-folium plotly pandas numpy sha
 
 ## API Keys & Secrets
 
-- **Key location:** wids-caregiver-alert/src/.streamlit/secrets.toml (gitignored)
-- **Format:** `ANTHROPIC_API_KEY = "sk-ant-api03-..."`
-- **Rotate at:** console.anthropic.com → Settings → API Keys
-- **⚠️ The key was exposed in git history on 2026-02-21 — rotate it immediately if not done**
 - Model: claude-sonnet-4-6 · Cost: $3/M input, $15/M output tokens
 
 ---
