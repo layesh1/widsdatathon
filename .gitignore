@@ -2,3 +2,5 @@
 01_raw_data/**/*.csv
 *.csv
 01_raw_data/*.csv
+wids-caregiver-alert/src/.streamlit/secrets.toml
+**/.streamlit/secrets.toml
