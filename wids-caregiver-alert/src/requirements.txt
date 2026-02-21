@@ -9,3 +9,5 @@ shapely
 geopandas
 scikit-learn
 requests
+scipy
+lifelines
