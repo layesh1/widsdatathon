@@ -76,18 +76,46 @@ def load_fire_perimeters():
         return json.load(f)
 
 
+def _classify_status(status):
+    """
+    Map raw status strings from GeoJSON to one of:
+    'order', 'warning', 'watch', 'normal'
+    """
+    s = str(status).lower().strip()
+
+    # Inactive / lifted / no order → treat as normal
+    if any(x in s for x in ['inactive', 'lifted', 'liftd', 'no evacuation',
+                              'no order', 'no status', 'nan', '00', '0',
+                              'normal', 'monitor']):
+        return 'normal'
+
+    # Evacuation Orders → red
+    if any(x in s for x in ['order', 'mandatory', 'go now', 'level 3']):
+        return 'order'
+
+    # Evacuation Warnings → orange
+    if any(x in s for x in ['warning', 'warn', 'level 2', 'be set']):
+        return 'warning'
+
+    # Watch / Shelter / Pre-Evacuation → yellow
+    if any(x in s for x in ['watch', 'shelter', 'advisory', 'ready',
+                              'pre-evacuation', 'pre evacuation',
+                              'level 1', 'be ready']):
+        return 'watch'
+
+    return 'normal'
+
+
 def _status_color(status):
-    for key in STATUS_COLORS:
-        if key and key.lower() in str(status).lower():
-            return STATUS_COLORS[key]
-    return STATUS_COLORS.get(status, "#888888")
+    kind = _classify_status(status)
+    return {'order': '#FF0000', 'warning': '#FF8C00',
+            'watch': '#FFD700', 'normal': '#00AA44'}.get(kind, '#888888')
 
 
 def _status_opacity(status):
-    for key in STATUS_FILL_OPACITY:
-        if key and key.lower() in str(status).lower():
-            return STATUS_FILL_OPACITY[key]
-    return STATUS_FILL_OPACITY.get(status, 0.10)
+    kind = _classify_status(status)
+    return {'order': 0.55, 'warning': 0.40,
+            'watch': 0.30, 'normal': 0.08}.get(kind, 0.10)
 
 
 def build_evacuation_map(
@@ -169,12 +197,10 @@ def build_evacuation_map(
             if selected_state != "All" and state != selected_state:
                 continue
 
-            s_lower = status.lower()
-            is_normal = not ("order" in s_lower or "warning" in s_lower
-                             or "watch" in s_lower or "shelter" in s_lower)
+            kind = _classify_status(status)
+            is_normal = (kind == 'normal')
 
-            # KEY FIX: skip creating the GeoJson object entirely for normal
-            # zones when they're hidden — avoids serializing ~30k polygons
+            # Skip normal zones when hidden to avoid serializing ~30k polygons
             if is_normal:
                 normal_count += 1
                 if not show_normal_zones:
@@ -198,11 +224,11 @@ def build_evacuation_map(
                 ),
             )
 
-            if "order" in s_lower:
+            if kind == 'order':
                 geo_layer.add_to(order_group);   order_count += 1
-            elif "warning" in s_lower:
+            elif kind == 'warning':
                 geo_layer.add_to(warning_group); warning_count += 1
-            elif "watch" in s_lower or "shelter" in s_lower:
+            elif kind == 'watch':
                 geo_layer.add_to(watch_group);   watch_count += 1
             else:
                 geo_layer.add_to(normal_group)
