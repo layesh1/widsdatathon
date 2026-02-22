@@ -1004,6 +1004,14 @@ def main():
 
     render_sidebar(fire_data)
 
+    # Legacy modules (fire_prediction_page, evacuation_planner, directions)
+    # expect 'latitude'/'longitude'/'fire_name'/'acres' column names.
+    # live_incident_feed uses 'lat'/'lon'/'name'/'acreage' — convert here.
+    fire_data_legacy = fire_data.rename(columns={
+        'lat': 'latitude', 'lon': 'longitude',
+        'name': 'fire_name', 'acreage': 'acres',
+    })
+
     # ── Emergency Worker ──────────────────────────────────────────────
     if role == "emergency_worker":
         if page == "Command Dashboard":
@@ -1012,7 +1020,7 @@ def main():
             render_chatbot(role)
         elif page == "Fire Predictor":
             render_fire_prediction_page(role="dispatcher",
-                                        fire_data=fire_data,
+                                        fire_data=fire_data_legacy,
                                         vulnerable_populations=vulnerable_populations)
 
     # ── Caregiver / Evacuee ───────────────────────────────────────────
@@ -1021,12 +1029,12 @@ def main():
             render_start_here(fire_data, vulnerable_populations)
         elif page == "Evacuation Planner":
             if PLANNER_AVAILABLE:
-                render_evacuation_planner_page(fire_data, vulnerable_populations)
+                render_evacuation_planner_page(fire_data_legacy, vulnerable_populations)
             else:
                 st.warning("Evacuation Planner module not available.")
         elif page == "Safe Routes & Transit":
             if DIRECTIONS_AVAILABLE:
-                render_directions_page(fire_data, vulnerable_populations)
+                render_directions_page(fire_data_legacy, vulnerable_populations)
             else:
                 st.warning("Safe Routes module not available.")
         elif page == "AI Assistant":
@@ -1048,7 +1056,7 @@ def main():
             render_about()
         elif page == "Fire Predictor":
             render_fire_prediction_page(role="analyst",
-                                        fire_data=fire_data,
+                                        fire_data=fire_data_legacy,
                                         vulnerable_populations=vulnerable_populations)
 
 
