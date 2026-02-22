@@ -2,9 +2,6 @@
 ## WiDS Datathon 2025 · Wildfire Caregiver Alert System
 ### Project Data & Code Reference — Context Document for Future Chats
 
-**UNC Charlotte · Team: Lean (layesh1@charlotte.edu) · GitHub: github.com/layesh1/widsdatathon**
-**Competition: WiDS Conference April 21–22, 2026 · Current Standing: 2nd Place**
-
 ---
 
 ## Project Overview
