@@ -26,6 +26,7 @@ except Exception:
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 from fire_data_integration import get_all_us_fires, get_fire_statistics, find_nearby_fires
+from fire_prediction_page import render_fire_prediction_page
 
 try:
     from evacuation_routes import generate_evacuation_routes_for_alerts
