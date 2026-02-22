@@ -290,6 +290,6 @@ git push layesh1 main
 
 - [ ] Agency coverage gap metric — geo_events_externalgeoeventchangelog.csv, multi-agency reporting as severity proxy
 - [ ] Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
-- [ ] Live incident feed — replace NASA FIRMS fallback with geo_events_geoevent.csv is_active fires
+- (completed) The live incident feed module (live_incident_feed.py) is now built and integrated — it automatically pulls fire data from your WiDS geo_events_geoevent.csv first, falls back to NASA FIRMS if that's unavailable, and surfaces across all three role dashboards with a sidebar source badge, live KPI metrics, and color-coded fire markers on the map. Need to do: Since geo_events_geoevent.csv isn't deployed to Streamlit Cloud, it's currently running on NASA FIRMS (🟡) as the fallback, which is fine — you're getting real active fire hotspots. You'd only see 🟢 if you copied that file into src/ and pushed it.
 - [ ] Zone duration analysis — evac_zones_gis_evaczonechangelog.csv, time-in-status per zone
-- (completed) ML-based fire spread prediction — done, fire_prediction_page.py
+- (completed) ML-based fire spread prediction — done, fire_prediction_page.py (need to do) changes to predicting without needing input for future fires, predicting where futures fires will be, etc.
