@@ -38,13 +38,11 @@ This system predicts evacuation delays for vulnerable populations during wildfir
 ## Repository Structure
 ```
 widsdatathon/
-├── requirements.txt                        ← single root requirements (source of truth)
+├── requirements.txt
 ├── .gitignore                              ← includes secrets.toml, large GeoJSONs
 ├── 01_raw_data/
-│   └── _README.txt
 ├── 02_documentation/
-│   ├── PROJECT_INDEX.txt
-│   └── WiDS_Context_Document.md
+│   └── WiDS_Context_Document.md           ← THIS FILE
 ├── 03_analysis_scripts/
 │   ├── 01_clean_data.py
 │   ├── 02_data_profiling.py
@@ -52,30 +50,26 @@ widsdatathon/
 │   ├── 04_eda_early_signals.py
 │   ├── 05_eda_geographic.py
 │   ├── 06_run_all.py
-│   └── 07_build_real_delays.py             ← main data pipeline script
+│   └── 07_build_real_delays.py            ← main data pipeline
 ├── 04_results/
-│   ├── equity_insights.txt
-│   └── summary_stats.txt
 ├── 05_visualizations/
 ├── 06_working_files/
-└── wids-caregiver-alert/
-    └── src/                                ← Streamlit Community Cloud points here
-        ├── wildfire_alert_dashboard.py     ← MAIN APP (renamed from caregiver_dashboard_FINAL.py)
-        ├── real_data_insights.py           ← pre-computes stats from real data CSV
-        ├── geo_map.py                      ← Folium map with GeoJSON layers
-        ├── fire_data_integration.py        ← NASA FIRMS live fire data
-        ├── evacuation_planner_page.py      ← caregiver/evacuee planner module
-        ├── evacuation_routes.py            ← route generation logic
-        ├── directions_page.py              ← Safe Routes & Transit page
-        ├── osm_routing.py                  ← OSRM open-source routing
-        ├── transit_and_safezones.py        ← transit layer
-        ├── us_cities_database.py           ← city lookup data
-        ├── us_territories_data.py          ← territory data
-        ├── usfa-registry-national.csv      ← fire dept data (~5MB, in git)
-        ├── requirements.txt                ← copy of root requirements.txt
-        ├── __init__.py
-        └── .streamlit/
-            └── secrets.toml               ← API key (NOT in git — gitignored)
+└── wids-caregiver-alert/src/              ← Streamlit Community Cloud points here
+    ├── wildfire_alert_dashboard.py        ← MAIN APP
+    ├── real_data_insights.py
+    ├── geo_map.py
+    ├── fire_data_integration.py
+    ├── evacuation_planner_page.py
+    ├── evacuation_routes.py
+    ├── directions_page.py
+    ├── osm_routing.py
+    ├── transit_and_safezones.py
+    ├── us_cities_database.py
+    ├── us_territories_data.py
+    ├── usfa-registry-national.csv         ← in git (~5MB)
+    ├── requirements.txt
+    ├── __init__.py
+    └── .streamlit/secrets.toml           ← NOT in git
 ```
 
 ---
