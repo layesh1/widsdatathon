@@ -59,6 +59,7 @@ except Exception:
     INSIGHTS_AVAILABLE = False
     def load_real_insights(): return None
 
+
 # ── Page config & CSS ────────────────────────────────────────────────
 st.set_page_config(page_title="Wildfire Caregiver Alert System", page_icon="🔥",
                    layout="wide", initial_sidebar_state="expanded")
@@ -100,10 +101,10 @@ CREDENTIALS = {
 }
 
 ROLE_PAGES = {
-    "emergency_worker": ["Command Dashboard","Fire Predictor","AI Assistant"],
-    "evacuee":          ["Start Here","Evacuation Planner","Safe Routes & Transit","AI Assistant"],
-    "analyst":          ["Dashboard","Equity Analysis","Risk Calculator",
-                         "Impact Projection","Fire Predictor","AI Assistant","About"],
+    "emergency_worker": ["Command Dashboard", "Fire Predictor", "AI Assistant"],
+    "evacuee":          ["Start Here", "Evacuation Planner", "Safe Routes & Transit", "AI Assistant"],
+    "analyst":          ["Dashboard", "Equity Analysis", "Risk Calculator",
+                         "Impact Projection", "Fire Predictor", "AI Assistant", "About"],
 }
 
 ROLE_COLORS = {
@@ -924,6 +925,8 @@ def main():
     if role == "emergency_worker":
         if page == "Command Dashboard":
             render_command_dashboard(fire_data, vulnerable_populations, usfa_data)
+        elif page == "Fire Predictor":
+            render_fire_prediction_page(role="dispatcher")
         elif page == "AI Assistant":
             render_chatbot(role)
 
@@ -954,6 +957,8 @@ def main():
             render_risk_calculator(vulnerable_populations)
         elif page == "Impact Projection":
             render_impact_projection()
+        elif page == "Fire Predictor":
+            render_fire_prediction_page(role="analyst")
         elif page == "AI Assistant":
             render_chatbot(role)
         elif page == "About":
