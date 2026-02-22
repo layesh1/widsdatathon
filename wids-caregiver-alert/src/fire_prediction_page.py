@@ -2,18 +2,19 @@
 fire_prediction_page.py
 49ers Intelligence Lab — WiDS Datathon 2025
 
-Role-aware Fire Spread Predictor page.
-  • Emergency Worker (dispatcher) → Operational tab: live fire dropdown, urgency banner,
-                                     caregiver alert preview, action checklist
-  • Data Analyst (datathon)       → Full tab: above + manual sliders, feature importance,
-                                     SHAP chart, batch CSV, research context
+Role-aware Fire Spread Predictor.
+  • dispatcher → live fire dropdown from already-loaded fire_data,
+                 friendly inputs (county dropdown, plain-language dropdowns),
+                 urgency banner, caregiver alert preview, action checklist
+  • analyst    → above + manual sliders, feature importance, batch CSV
 
 Integration in wildfire_alert_dashboard.py:
-
     from fire_prediction_page import render_fire_prediction_page
-    render_fire_prediction_page(role=st.session_state.get("role", "analyst"))
-
-role values expected: "dispatcher" | "analyst"  (caregiver login doesn't see this page)
+    render_fire_prediction_page(
+        role=st.session_state.get("role", "analyst"),
+        fire_data=fire_data,                  # pass in already-loaded df
+        vulnerable_populations=vulnerable_populations,  # pass in already-loaded dict
+    )
 """
 
 import streamlit as st
@@ -23,6 +24,22 @@ import json
 from pathlib import Path
 import datetime
 
+# ── Growth rate mappings (plain language → acres/hour) ────────────────────────
+SPREAD_LABELS = {
+    "🐢 Slow  (< 5 ac/hr)":        3.0,
+    "🚶 Moderate  (5–20 ac/hr)":   12.0,
+    "🏃 Fast  (20–100 ac/hr)":     55.0,
+    "🚗 Very Fast  (100–300 ac/hr)": 180.0,
+    "🚀 Extreme  (> 300 ac/hr)":   400.0,
+}
+
+SIZE_LABELS = {
+    "Small  (< 100 acres)":         50,
+    "Medium  (100–1,000 acres)":    500,
+    "Large  (1,000–10,000 acres)":  5000,
+    "Very Large  (10k–50k acres)":  25000,
+    "Megafire  (> 50,000 acres)":   100000,
+}
 
 # ── Model loader ──────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -38,7 +55,7 @@ def load_models():
             meta = json.load(f)
         delay_model = joblib.load(model_dir / "evac_delay_model.pkl") \
             if (model_dir / "evac_delay_model.pkl").exists() else None
-        clf_model   = joblib.load(model_dir / "fire_escalation_model.pkl") \
+        clf_model = joblib.load(model_dir / "fire_escalation_model.pkl") \
             if (model_dir / "fire_escalation_model.pkl").exists() else None
         return delay_model, clf_model, meta, None
     except Exception as e:
@@ -82,8 +99,8 @@ def run_prediction(params, delay_model, clf_model, meta, demo_mode):
     else:
         gr  = params.get("growth_rate_acres_per_hour", 10)
         svi = params.get("svi_score", 0.5)
-        predicted_hours  = max(0.5, 22.3 * (1 + 0.3 * svi) * max(0.1, 1 - gr / 300))
-        escalation_prob  = min(0.95, gr / 200 + svi * 0.3)
+        predicted_hours = max(0.5, 22.3 * (1 + 0.3 * svi) * max(0.1, 1 - gr / 300))
+        escalation_prob = min(0.95, gr / 200 + svi * 0.3)
     return predicted_hours, escalation_prob
 
 
@@ -103,7 +120,7 @@ def render_result_cards(predicted_hours, escalation_prob):
     m1, m2, m3 = st.columns(3)
     m1.metric("Est. hours to evacuation order",
               f"{predicted_hours:.1f}h",
-              delta=f"{predicted_hours - 1.1:+.1f}h vs. median")
+              delta=f"{predicted_hours - 1.1:+.1f}h vs. median (1.1h)")
     m2.metric("Escalation probability", f"{escalation_prob*100:.0f}%")
     m3.metric("Caregiver lead time",
               f"{max(0, predicted_hours - 1.0):.1f}h",
@@ -113,6 +130,7 @@ def render_result_cards(predicted_hours, escalation_prob):
 def render_alert_preview(params, predicted_hours):
     svi = params.get("svi_score", 0.5)
     gr  = params.get("growth_rate_acres_per_hour", 0)
+    fire_name = params.get("fire_name", "Active Fire")
     county_vuln = "HIGH" if svi >= 0.75 else "MODERATE" if svi >= 0.5 else "LOW"
     border_color = "#ff4444" if predicted_hours < 2 else "#ff8800" if predicted_hours < 6 else "#ffcc00"
     level, desc, _ = urgency_info(predicted_hours)
@@ -133,13 +151,14 @@ def render_alert_preview(params, predicted_hours):
 <p style="margin:0 0 10px 0;font-size:1.05rem;font-weight:bold;color:{border_color};">
   🔥 WILDFIRE ALERT — {level} &nbsp;|&nbsp; {desc}</p>
 <p style="margin:0;color:#ddd;line-height:1.7;font-size:0.95rem;">
+  Fire: <b>{fire_name}</b><br>
   Current growth: <b>{gr:.1f} acres/hour</b><br>
   County vulnerability: <b>{county_vuln}</b> (SVI {svi:.2f})<br>
   Est. time to evacuation order: <b>{predicted_hours:.1f} hours</b><br><br>
   <span style="color:{border_color};font-weight:bold;">{action}</span>
 </p></div>
 """, unsafe_allow_html=True)
-    st.write("")  # spacer
+    st.write("")
 
 
 def render_action_checklist(predicted_hours):
@@ -171,59 +190,170 @@ def render_action_checklist(predicted_hours):
         st.checkbox(item, key=f"chk_{item[:30]}")
 
 
-def load_firms_params():
-    """Load fire params from NASA FIRMS. Returns (params_dict, fire_name) or (None, None)."""
-    try:
-        from fire_data_integration import get_active_fires
-        fires = get_active_fires()
-        if not fires:
-            return None, None
-        fire_options = {f.get("name", f"Fire {i}"): f for i, f in enumerate(fires[:20])}
-        selected_name = st.selectbox("Select active fire", list(fire_options.keys()))
-        f = fire_options[selected_name]
-        params = {
-            "lat":                        f.get("latitude",  f.get("lat", 37.0)),
-            "lon":                        f.get("longitude", f.get("lon", -119.0)),
-            "max_acres":                  f.get("acreage",   f.get("acres", 100)),
-            "growth_rate_acres_per_hour": f.get("growth_rate", 10.0),
-            "svi_score":                  f.get("svi_score", 0.5),
-            "fire_month":                 datetime.datetime.now().month,
-        }
-        return params, selected_name
-    except ImportError:
+# ── Live fire selector from already-loaded fire_data ─────────────────────────
+def build_params_from_live_fire(fire_data, vulnerable_populations):
+    """
+    Shows a dropdown of active fires from the already-loaded fire_data df.
+    Auto-fills SVI from nearest vulnerable county.
+    Returns params dict or None.
+    """
+    if fire_data is None or len(fire_data) == 0:
         return None, None
 
+    # Filter to named fires with location data
+    df = fire_data.copy()
+    df = df[df["latitude"].notna() & df["longitude"].notna()]
+
+    # Build display names
+    if "fire_name" in df.columns:
+        df["display"] = df.apply(
+            lambda r: f"{r.get('fire_name','Unknown')} — "
+                      f"{r.get('acres', r.get('acreage', 0)):,.0f} acres",
+            axis=1
+        )
+    else:
+        df["display"] = df.apply(
+            lambda r: f"Fire at {r['latitude']:.2f}, {r['longitude']:.2f} — "
+                      f"{r.get('acres', 0):,.0f} acres",
+            axis=1
+        )
+
+    df = df.drop_duplicates(subset=["display"]).head(30)
+    options = df["display"].tolist()
+
+    if not options:
+        return None, None
+
+    selected_display = st.selectbox("🔥 Select active fire", options,
+                                    help="Fires pulled from NASA FIRMS / NIFC live feed")
+    row = df[df["display"] == selected_display].iloc[0]
+
+    fire_lat = float(row["latitude"])
+    fire_lon = float(row["longitude"])
+    fire_acres = float(row.get("acres", row.get("acreage", 100)) or 100)
+    fire_name = row.get("fire_name", "Active Fire")
+
+    # Auto-lookup nearest vulnerable county for SVI
+    svi_score = 0.5  # default
+    nearest_county = None
+    if vulnerable_populations:
+        min_dist = float("inf")
+        for county, data in vulnerable_populations.items():
+            dist = ((data["lat"] - fire_lat)**2 + (data["lon"] - fire_lon)**2)**0.5
+            if dist < min_dist:
+                min_dist = dist
+                svi_score = data["svi_score"]
+                nearest_county = county
+
+    # Show what was auto-filled
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Fire size", f"{fire_acres:,.0f} acres")
+    c2.metric("Nearest vulnerable county", nearest_county or "Unknown")
+    c3.metric("County SVI (auto)", f"{svi_score:.2f}",
+              delta="High vulnerability" if svi_score >= 0.75 else "Moderate" if svi_score >= 0.5 else "Low",
+              delta_color="inverse" if svi_score >= 0.75 else "off")
+
+    # Estimate growth rate from fire data if available
+    growth_rate = float(row.get("growth_rate", row.get("growth_rate_acres_per_hour", 10)) or 10)
+
+    params = {
+        "fire_name":                  fire_name,
+        "lat":                        fire_lat,
+        "lon":                        fire_lon,
+        "max_acres":                  fire_acres,
+        "growth_rate_acres_per_hour": growth_rate,
+        "svi_score":                  svi_score,
+        "fire_month":                 datetime.datetime.now().month,
+    }
+    return params, fire_name
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DISPATCHER VIEW  —  operational, fast, no ML internals
+# DISPATCHER VIEW
 # ═══════════════════════════════════════════════════════════════════════════════
-def render_dispatcher_tab(delay_model, clf_model, meta, demo_mode):
+def render_dispatcher_tab(delay_model, clf_model, meta, demo_mode,
+                           fire_data=None, vulnerable_populations=None):
     st.subheader("🚒 Operational Predictor")
-    st.caption("Select a live fire to predict evacuation timing and preview the caregiver alert.")
+    st.caption("Select a live fire or enter details to predict evacuation timing.")
 
-    params, fire_name = load_firms_params()
+    input_mode = st.radio("Data source", ["🛰 Live Fire Feed", "✏️ Enter Manually"],
+                          horizontal=True)
 
-    if params is None:
-        st.info("Live fire feed unavailable — enter parameters manually.")
+    params = None
+
+    if input_mode == "🛰 Live Fire Feed":
+        params, fire_name = build_params_from_live_fire(fire_data, vulnerable_populations)
+
+        if params is None:
+            st.warning("No live fire data available right now. Switching to manual entry.")
+            input_mode = "✏️ Enter Manually"
+        else:
+            # Let dispatcher override spread rate with plain-language dropdown
+            st.divider()
+            st.markdown("**Confirm fire behavior** *(override auto-estimate if needed)*")
+            c1, c2 = st.columns(2)
+            with c1:
+                spread_label = st.selectbox(
+                    "How fast is it spreading?",
+                    list(SPREAD_LABELS.keys()),
+                    index=1,
+                    help=f"Auto-estimated: {params['growth_rate_acres_per_hour']:.1f} ac/hr"
+                )
+                # Use dropdown value
+                params["growth_rate_acres_per_hour"] = SPREAD_LABELS[spread_label]
+            with c2:
+                size_label = st.selectbox(
+                    "Current fire size",
+                    list(SIZE_LABELS.keys()),
+                    index=1,
+                    help=f"Auto-filled: {params['max_acres']:,.0f} acres from live feed"
+                )
+                params["max_acres"] = SIZE_LABELS[size_label]
+
+    if input_mode == "✏️ Enter Manually":
+        st.markdown("**Fire location**")
+        county_options = sorted(vulnerable_populations.keys()) \
+            if vulnerable_populations else []
+
         c1, c2 = st.columns(2)
         with c1:
-            gr    = st.number_input("Growth rate (acres/hour)", 0.0, 1000.0, 50.0, step=5.0)
-            acres = st.number_input("Current size (acres)", 1, 500000, 500)
+            if county_options:
+                selected_county = st.selectbox(
+                    "Nearest vulnerable county",
+                    county_options,
+                    help="Auto-fills SVI, lat, and lon"
+                )
+                county_data = vulnerable_populations[selected_county]
+                lat = county_data["lat"]
+                lon = county_data["lon"]
+                svi = county_data["svi_score"]
+                st.caption(f"SVI: {svi:.2f} · Lat: {lat:.2f} · Lon: {lon:.2f}")
+            else:
+                lat = st.number_input("Latitude",  value=37.5)
+                lon = st.number_input("Longitude", value=-119.5)
+                svi = 0.5
+
         with c2:
-            svi = st.slider("County SVI", 0.0, 1.0, 0.5, 0.01,
-                            help="≥0.75 = high vulnerability")
-            lat = st.number_input("Latitude",  value=37.5)
-            lon = st.number_input("Longitude", value=-119.5)
+            spread_label = st.selectbox("How fast is it spreading?",
+                                        list(SPREAD_LABELS.keys()), index=1)
+            size_label   = st.selectbox("Current fire size",
+                                        list(SIZE_LABELS.keys()), index=1)
+
         params = {
-            "growth_rate_acres_per_hour": gr, "max_acres": acres,
-            "svi_score": svi, "lat": lat, "lon": lon,
-            "fire_month": datetime.datetime.now().month,
+            "fire_name":                  "Manual Entry",
+            "lat":                        lat,
+            "lon":                        lon,
+            "max_acres":                  SIZE_LABELS[size_label],
+            "growth_rate_acres_per_hour": SPREAD_LABELS[spread_label],
+            "svi_score":                  svi,
+            "fire_month":                 datetime.datetime.now().month,
         }
 
     st.divider()
 
-    if st.button("🔮 Predict Evacuation Timing", type="primary", use_container_width=True):
-        with st.spinner("Running prediction..."):
+    if params and st.button("🔮 Predict Evacuation Timing", type="primary",
+                             use_container_width=True):
+        with st.spinner("Running model..."):
             predicted_hours, escalation_prob = run_prediction(
                 params, delay_model, clf_model, meta, demo_mode)
 
@@ -238,9 +368,10 @@ def render_dispatcher_tab(delay_model, clf_model, meta, demo_mode):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ANALYST VIEW  —  full model explorer + batch
+# ANALYST VIEW
 # ═══════════════════════════════════════════════════════════════════════════════
-def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
+def render_analyst_tab(delay_model, clf_model, meta, demo_mode,
+                        fire_data=None, vulnerable_populations=None):
     st.subheader("🔬 Model Explorer")
 
     if not demo_mode:
@@ -254,9 +385,17 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
 
     st.divider()
 
-    input_mode = st.radio("Input mode", ["Manual entry", "Load from NASA FIRMS"], horizontal=True)
+    input_mode = st.radio("Input mode",
+                          ["🛰 Live Fire Feed", "✏️ Manual entry"],
+                          horizontal=True)
 
-    if input_mode == "Manual entry":
+    if input_mode == "🛰 Live Fire Feed":
+        params, _ = build_params_from_live_fire(fire_data, vulnerable_populations)
+        if params is None:
+            st.warning("No live fire data — using manual entry.")
+            input_mode = "✏️ Manual entry"
+
+    if input_mode == "✏️ Manual entry":
         c1, c2 = st.columns(2)
         with c1:
             gr    = st.slider("Growth rate (acres/hour)", 0.0, 500.0, 50.0, 5.0,
@@ -266,28 +405,24 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
                                  format_func=lambda m: ["Jan","Feb","Mar","Apr","May","Jun",
                                                         "Jul","Aug","Sep","Oct","Nov","Dec"][m-1])
         with c2:
-            svi = st.slider("County SVI", 0.0, 1.0, 0.5, 0.01, help="≥0.75 = high vulnerability")
+            svi = st.slider("County SVI", 0.0, 1.0, 0.5, 0.01,
+                            help="≥0.75 = high vulnerability")
             lat = st.number_input("Latitude",  -90.0,  90.0,  37.5)
             lon = st.number_input("Longitude", -180.0,  0.0, -119.5)
 
         with st.expander("SVI components (advanced)"):
-            pct_el  = st.slider("% age 65+",              0.0, 0.5, 0.14, 0.01)
-            pct_pov = st.slider("% below poverty line",   0.0, 0.6, 0.12, 0.01)
-            pct_dis = st.slider("% with disability",      0.0, 0.5, 0.12, 0.01)
-            pct_nov = st.slider("% no vehicle",           0.0, 0.4, 0.08, 0.01)
+            pct_el  = st.slider("% age 65+",            0.0, 0.5, 0.14, 0.01)
+            pct_pov = st.slider("% below poverty line", 0.0, 0.6, 0.12, 0.01)
+            pct_dis = st.slider("% with disability",    0.0, 0.5, 0.12, 0.01)
+            pct_nov = st.slider("% no vehicle",         0.0, 0.4, 0.08, 0.01)
 
         params = {
+            "fire_name": "Manual Entry",
             "growth_rate_acres_per_hour": gr, "max_acres": acres,
             "svi_score": svi, "lat": lat, "lon": lon, "fire_month": month,
             "pct_elderly": pct_el, "pct_poverty": pct_pov,
             "pct_disabled": pct_dis, "pct_no_vehicle": pct_nov,
         }
-    else:
-        params, _ = load_firms_params()
-        if params is None:
-            params = {"growth_rate_acres_per_hour": 50, "max_acres": 500,
-                      "svi_score": 0.5, "lat": 37.5, "lon": -119.5,
-                      "fire_month": datetime.datetime.now().month}
 
     st.divider()
 
@@ -303,7 +438,7 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
         with st.expander("📱 Caregiver Alert Preview"):
             render_alert_preview(params, predicted_hours)
 
-        # ── Feature importance ────────────────────────────────────────────────
+        # Feature importance
         st.subheader("🔍 Feature Importance")
         feat_imp = []
         if not demo_mode and delay_model is not None:
@@ -317,7 +452,7 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
             except Exception:
                 pass
 
-        if not feat_imp:  # demo fallback
+        if not feat_imp:
             feat_imp = [
                 ("growth_rate", 0.35), ("svi_score", 0.22),
                 ("region_california", 0.12), ("max_acres_log", 0.10),
@@ -341,7 +476,6 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
                           yaxis=dict(autorange="reversed"))
         st.plotly_chart(fig, use_container_width=True)
 
-        # ── Real data benchmarks ──────────────────────────────────────────────
         with st.expander("📚 Real WiDS data benchmarks"):
             st.markdown("""
 | Metric | Value | Source |
@@ -354,7 +488,7 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
 | Projected lives saved (65% adoption) | **500–1,500/year** | Model projection |
 """)
 
-    # ── Batch prediction ──────────────────────────────────────────────────────
+    # Batch prediction
     st.divider()
     with st.expander("📋 Batch prediction (CSV upload)"):
         st.markdown("Required columns: `growth_rate_acres_per_hour`, `max_acres`, `svi_score`")
@@ -383,14 +517,17 @@ def render_analyst_tab(delay_model, clf_model, meta, demo_mode):
 # ═══════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
-def render_fire_prediction_page(role: str = "analyst"):
+def render_fire_prediction_page(role: str = "analyst",
+                                 fire_data=None,
+                                 vulnerable_populations=None):
     """
     Call from wildfire_alert_dashboard.py:
-        render_fire_prediction_page(role=st.session_state.get("role", "analyst"))
 
-    role: "dispatcher" → operational tab only
-          "analyst"    → both tabs (Operational + Model Explorer)
-    Caregiver login should NOT include this page in its sidebar nav.
+        render_fire_prediction_page(
+            role=st.session_state.get("role", "analyst"),
+            fire_data=fire_data,
+            vulnerable_populations=vulnerable_populations,
+        )
     """
     st.title("🔥 Fire Spread Predictor")
     st.caption("ML-powered evacuation timing · trained on 653 real WiDS fires (2021–2025)")
@@ -399,11 +536,16 @@ def render_fire_prediction_page(role: str = "analyst"):
     demo_mode = error is not None
 
     if role == "dispatcher":
-        render_dispatcher_tab(delay_model, clf_model, meta, demo_mode)
-
-    else:  # analyst (or fallback)
+        render_dispatcher_tab(delay_model, clf_model, meta, demo_mode,
+                              fire_data=fire_data,
+                              vulnerable_populations=vulnerable_populations)
+    else:
         tab_ops, tab_model = st.tabs(["🚒 Operational View", "🔬 Model Explorer"])
         with tab_ops:
-            render_dispatcher_tab(delay_model, clf_model, meta, demo_mode)
+            render_dispatcher_tab(delay_model, clf_model, meta, demo_mode,
+                                  fire_data=fire_data,
+                                  vulnerable_populations=vulnerable_populations)
         with tab_model:
-            render_analyst_tab(delay_model, clf_model, meta, demo_mode)
+            render_analyst_tab(delay_model, clf_model, meta, demo_mode,
+                               fire_data=fire_data,
+                               vulnerable_populations=vulnerable_populations)
