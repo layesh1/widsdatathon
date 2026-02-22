@@ -292,4 +292,4 @@ git push layesh1 main
 - [ ] Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
 - [ ] Live incident feed — replace NASA FIRMS fallback with geo_events_geoevent.csv is_active fires
 - [ ] Zone duration analysis — evac_zones_gis_evaczonechangelog.csv, time-in-status per zone
-- [✅] ML-based fire spread prediction — done, fire_prediction_page.py
+- (completed) ML-based fire spread prediction — done, fire_prediction_page.py
