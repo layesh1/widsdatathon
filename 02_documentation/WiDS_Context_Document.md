@@ -30,6 +30,11 @@ This system predicts evacuation delays for vulnerable populations during wildfir
 - **Getis-Ord Gi*** — identifies statistically significant clusters of delayed evacuations
 - **Alert classification triage** — prioritizes which vulnerable populations to alert first
 
+- Models (models/)
+  evac_delay_model.pkl       XGBoost regressor, predicts hours_to_order, MAE 23.4h, R² 0.16, trained on 605 fires
+  fire_escalation_model.pkl  Random Forest classifier, predicts growth >100 ac/hr, recall 1.0 on escalating fires, trained on 19,392 fires
+  feature_cols.json          Feature metadata and training stats
+
 ---
 
 ## Repository Structure
@@ -47,12 +52,18 @@ widsdatathon/
 │   ├── 04_eda_early_signals.py
 │   ├── 05_eda_geographic.py
 │   ├── 06_run_all.py
-│   └── 07_build_real_delays.py            ← main data pipeline
+│   ├── 07_build_real_delays.py            ← main data pipeline
+│   └── 08_fire_spread_predictor.py        ← trains evac delay + escalation models
 ├── 04_results/
 ├── 05_visualizations/
 ├── 06_working_files/
+├── models/                                ← NOT in git (generate locally)
+│   ├── evac_delay_model.pkl               ← XGBoost regressor, MAE 23.4h, R² 0.16
+│   ├── fire_escalation_model.pkl          ← Random Forest classifier, recall 1.0
+│   └── feature_cols.json                 ← feature metadata + training stats
 └── wids-caregiver-alert/src/              ← Streamlit Community Cloud points here
     ├── wildfire_alert_dashboard.py        ← MAIN APP
+    ├── fire_prediction_page.py            ← Fire Spread Predictor (dispatcher + analyst)
     ├── real_data_insights.py
     ├── geo_map.py
     ├── fire_data_integration.py
@@ -149,6 +160,7 @@ evac_zones_gis_evaczone.csv
 | 04_eda_early_signals.py | 03_analysis_scripts/ | Early signals EDA |
 | 05_eda_geographic.py | 03_analysis_scripts/ | Geographic patterns EDA |
 | 06_run_all.py | 03_analysis_scripts/ | Runs full analysis pipeline |
+08_fire_spread_predictor.py  03_analysis_scripts/  Trains evac delay + escalation models. Outputs to models/. ~2 min. Run from repo root.
 
 **Run build_real_delays.py:**
 ```bash
@@ -194,7 +206,7 @@ pip3 install streamlit anthropic folium streamlit-folium plotly pandas numpy sha
 | Impact Projection | Analyst | Real baseline + sliders | Uses real 1.1h baseline |
 | AI Assistant | All roles | Anthropic claude-sonnet-4-6 | EVAC-OPS / SAFE-PATH / DATA-LAB personas |
 | About | Analyst | — | Real findings cited |
-
+ Fire Predictor  | Emergency Worker + Analyst | fire_events_with_svi_and_delays.csv + fire_data | XGBoost evac delay model + escalation classifier
 ---
 
 ## Demo Login Credentials
@@ -280,3 +292,4 @@ git push layesh1 main
 - [ ] Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
 - [ ] Live incident feed — replace NASA FIRMS fallback with geo_events_geoevent.csv is_active fires
 - [ ] Zone duration analysis — evac_zones_gis_evaczonechangelog.csv, time-in-status per zone
+- [✅] ML-based fire spread prediction — done, fire_prediction_page.py
