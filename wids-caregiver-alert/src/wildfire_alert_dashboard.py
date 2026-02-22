@@ -100,10 +100,10 @@ CREDENTIALS = {
 }
 
 ROLE_PAGES = {
-    "emergency_worker": ["Command Dashboard","AI Assistant"],
+    "emergency_worker": ["Command Dashboard","Fire Predictor","AI Assistant"],
     "evacuee":          ["Start Here","Evacuation Planner","Safe Routes & Transit","AI Assistant"],
     "analyst":          ["Dashboard","Equity Analysis","Risk Calculator",
-                         "Impact Projection","AI Assistant","About"],
+                         "Impact Projection","Fire Predictor","AI Assistant","About"],
 }
 
 ROLE_COLORS = {
