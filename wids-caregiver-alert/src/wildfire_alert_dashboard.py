@@ -1019,9 +1019,7 @@ def main():
         elif page == "AI Assistant":
             render_chatbot(role)
         elif page == "Fire Predictor":
-            render_fire_prediction_page(role="dispatcher",
-                                        fire_data=fire_data_legacy,
-                                        vulnerable_populations=vulnerable_populations)
+            render_fire_prediction_page(role="dispatcher")
 
     # ── Caregiver / Evacuee ───────────────────────────────────────────
     elif role == "evacuee":
@@ -1055,10 +1053,7 @@ def main():
         elif page == "About":
             render_about()
         elif page == "Fire Predictor":
-            render_fire_prediction_page(role="analyst",
-                                        fire_data=fire_data_legacy,
-                                        vulnerable_populations=vulnerable_populations)
-
+            render_fire_prediction_page(role="analyst")
 
 if __name__ == "__main__":
     main()
