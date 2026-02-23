@@ -73,6 +73,8 @@ widsdatathon/
     ├── directions_page.py
     ├── osm_routing.py
     ├── transit_and_safezones.py
+    ├── agency_coverage_page.py        ← Agency Coverage Gap (analyst)
+    ├── alert_channel_equity_page.py   ← Alert Channel Equity (analyst)
     ├── us_cities_database.py
     ├── us_territories_data.py
     ├── usfa-registry-national.csv         ← in git (~5MB)
@@ -208,6 +210,7 @@ pip3 install streamlit anthropic folium streamlit-folium plotly pandas numpy sha
 | AI Assistant | All roles | Anthropic claude-sonnet-4-6 | EVAC-OPS / SAFE-PATH / DATA-LAB personas |
 | About | Analyst | — | Real findings cited |
  Fire Predictor  | Emergency Worker + Analyst | fire_events_with_svi_and_delays.csv + fire_data | XGBoost evac delay model + escalation classifier
+PageRoleData SourcesNotesAgency CoverageAnalystgeo_events_externalgeoeventchangelog.csv, SVISingle vs multi-agency reporting, state gap indexAlert Channel EquityAnalystgeo_events_externalgeoevent.csv, SVIManual vs automated coverage by SVI decile, triage integration
 ---
 
 ## Demo Login Credentials
@@ -289,9 +292,8 @@ git push layesh1 main
 ---
 
 ## Future Work (Pre-April Conference)
-
-- [ ] Agency coverage gap metric — geo_events_externalgeoeventchangelog.csv, multi-agency reporting as severity proxy
-- [ ] Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
+- (completed )Agency coverage gap metric — geo_events_externalgeoeventchangelog.csv, multi-agency reporting as severity proxy
+- (completed) Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
 - (completed) The live incident feed module (live_incident_feed.py) is now built and integrated — it automatically pulls fire data from your WiDS geo_events_geoevent.csv first, falls back to NASA FIRMS if that's unavailable, and surfaces across all three role dashboards with a sidebar source badge, live KPI metrics, and color-coded fire markers on the map. Need to do: Since geo_events_geoevent.csv isn't deployed to Streamlit Cloud, it's currently running on NASA FIRMS (🟡) as the fallback, which is fine — you're getting real active fire hotspots. You'd only see 🟢 if you copied that file into src/ and pushed it.
 - [ ] Zone duration analysis — evac_zones_gis_evaczonechangelog.csv, time-in-status per zone
 - (completed) ML-based fire spread prediction — done, fire_prediction_page.py (need to do) changes to predicting without needing input for future fires, predicting where futures fires will be, etc.
