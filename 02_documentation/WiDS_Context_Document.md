@@ -66,6 +66,7 @@ widsdatathon/
     ├── fire_prediction_page.py            ← Fire Spread Predictor (dispatcher + analyst)
     ├── real_data_insights.py
     ├── geo_map.py
+    ├── live_incident_feed.py          ← Smart fire data loader (geo_events → FIRMS → demo)
     ├── fire_data_integration.py
     ├── evacuation_planner_page.py
     ├── evacuation_routes.py
@@ -269,6 +270,7 @@ git push layesh1 main
 6. **evac_zones_active.geojson and evac_zones_slim.geojson** — removed from git history on 2026-02-21 via filter-branch. Gitignored. Keep locally only.
 7. **secrets.toml was in git history** — removed and gitignored on 2026-02-21. Rotate API key.
 8. **Only 653 fires have real evac timing** — WiDS dataset has limited formal activations. 19,392 fires have growth rate data. This is real, not simulated.
+9. fire_prediction_page.py loads fire data internally — do NOT pass fire_data= as a kwarg, call as render_fire_prediction_page(role="dispatcher") only
 
 ---
 
