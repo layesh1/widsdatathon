@@ -3,9 +3,18 @@ wildfire_alert_dashboard.py — 49ers Intelligence Lab · WiDS 2025
 Main entry point. Single clean version — no duplicate sidebar.
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Ensure src/ directory is on the path — needed for Streamlit Cloud
+src_dir = Path(__file__).parent.resolve()
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+os.chdir(src_dir)  # so relative file paths (GeoJSON, CSV) resolve correctly
+
 import streamlit as st
 import inspect
-from pathlib import Path
 from live_incident_feed import load_fire_data
 
 st.set_page_config(
