@@ -1,962 +1,830 @@
-"""
-caregiver_dashboard_FINAL.py  —  49ers Intelligence Lab WiDS 2025
+#streamlit run /Users/nadianarayanan/datathon/widsdatathon/wids-caregiver-alert/src/wildfire_alert_dashboard.py
 
-Role-based pages:
-  Emergency Worker  →  Command Dashboard, AI Assistant
-  Caregiver/Evacuee →  Start Here, Evacuation Planner, Safe Routes & Transit, AI Assistant
-  Data Analyst      →  Dashboard, Equity Analysis, Risk Calculator, Impact Projection,
-                       AI Assistant, About
 """
+wildfire_alert_dashboard.py — 49ers Intelligence Lab · WiDS 2025
+
+CHANGES FROM PREVIOUS VERSION
+──────────────────────────────
+1.  Streamlit default theme preserved — only structural/component CSS added
+2.  Emojis removed from all page titles and navigation labels
+3.  AI Assistant: open by default on right side; inline Close + Full Screen buttons
+4.  AI system prompts: no personal info shared; advisory-only with strong reasoning
+5.  Data Analyst gains "Data Governance" page (inline, no extra file needed)
+6.  "About" page content centered
+7.  Sign-up: Caregiver = self-declaration; Dispatcher/Analyst = requires access code
+8.  Evacuation status widget: update for self OR monitored person
+9.  AI chat: enhanced UI with avatars, timestamps, suggestions
+10. AI chat: persistent history saved per-user to JSON in src directory
+11. AI panel: left border via CSS :has(.ai-col-marker) targeting the actual column element
+12. Suggestion chips: only shown in fullscreen mode
+
+Test credentials
+────────────────
+  caregiver_test  | WiDS@2025! | Caregiver/Evacuee
+  dispatcher_test | WiDS@2025! | Emergency Worker   (code: DISPATCH-2025)
+  analyst_test    | WiDS@2025! | Data Analyst        (code: ANALYST-WiDS9)
+
+Secrets required (.streamlit/secrets.toml)
+───────────────────────────────────────────
+  SUPABASE_URL      = "https://xxxx.supabase.co"
+  SUPABASE_ANON_KEY = "eyJ..."
+  ANTHROPIC_API_KEY = "sk-ant-..."
+"""
+
+import sys, os, inspect, json
+from pathlib import Path
+from datetime import datetime
+
+src_dir = Path(__file__).parent.resolve()
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+os.chdir(src_dir)
 
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import folium
-from streamlit_folium import st_folium
-import os, base64, anthropic
 
-try:
-    from geo_map import render_map_with_controls
-    GEO_MAP_AVAILABLE = True
-except Exception:
-    GEO_MAP_AVAILABLE = False
+from live_incident_feed import load_fire_data
+from auth_supabase import (
+    render_auth_page,
+    render_user_profile_sidebar,
+    log_page_visit,
+    sign_out,
+    get_evacuation_plan,
+)
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+st.set_page_config(
+    page_title="49ers Intelligence Lab — WiDS 2025",
+    page_icon="🔥",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-from fire_data_integration import get_all_us_fires, get_fire_statistics, find_nearby_fires
-
-try:
-    from evacuation_routes import generate_evacuation_routes_for_alerts
-    EVACUATION_AVAILABLE = True
-except Exception:
-    EVACUATION_AVAILABLE = False
-
-try:
-    from osm_routing import get_real_driving_route
-    OSM_ROUTING_AVAILABLE = True
-except Exception:
-    OSM_ROUTING_AVAILABLE = False
-
-try:
-    from evacuation_planner_page import render_evacuation_planner_page
-    PLANNER_AVAILABLE = True
-except Exception:
-    PLANNER_AVAILABLE = False
-
-try:
-    from directions_page import render_directions_page
-    DIRECTIONS_AVAILABLE = True
-except Exception:
-    DIRECTIONS_AVAILABLE = False
-
-try:
-    from real_data_insights import load_real_insights
-    INSIGHTS_AVAILABLE = True
-except Exception:
-    INSIGHTS_AVAILABLE = False
-    def load_real_insights(): return None
-
-# ── Page config & CSS ────────────────────────────────────────────────
-st.set_page_config(page_title="Wildfire Caregiver Alert System", page_icon="🔥",
-                   layout="wide", initial_sidebar_state="expanded")
-
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPONENT STYLES
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-.main-header{font-size:2.5rem;font-weight:700;color:#FF4B4B;text-align:center;margin-bottom:2rem;}
-.risk-high  {background:#FF4B4B;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
-.risk-medium{background:#FFA500;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
-.risk-low   {background:#00CC00;color:white;padding:1rem;border-radius:8px;font-weight:bold;}
+.stButton > button[kind="primary"] { border-left: 3px solid #AA0000 !important; }
+
+.role-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600; margin-right: 6px;
+}
+.brand-block { text-align: center; margin-bottom: 0.6rem; }
+.brand-name  { font-size: 1.05rem; font-weight: 700; }
+.brand-sub   { font-size: 0.74rem; opacity: 0.65; }
+
+.about-centered { max-width: 760px; margin: 0 auto; text-align: center; }
+.about-centered h3    { text-align: left; }
+.about-centered table { margin: 0 auto; }
+
+/* ══════════════════════════════════════════════════════
+   AI COLUMN SEPARATOR
+   Uses :has() to style the actual Streamlit column element
+   that contains our .ai-col-marker sentinel div.
+   This avoids the broken wrapper-div approach.
+   ══════════════════════════════════════════════════════ */
+div[data-testid="stColumn"]:has(.ai-col-marker) {
+    border-left: 2px solid rgba(170, 0, 0, 0.3) !important;
+    padding-left: 20px !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   ENHANCED AI CHAT PANEL
+   ══════════════════════════════════════════════════════ */
+
+.ai-chat-card {
+    border: 1px solid rgba(128,128,128,0.18);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+.ai-chat-header {
+    background: linear-gradient(135deg, #AA0000 0%, #cc3300 60%, #e05500 100%);
+    padding: 14px 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ai-chat-avatar-bot {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.4);
+}
+.ai-chat-header-text { flex: 1; }
+.ai-chat-title {
+    color: #fff; font-weight: 700; font-size: 0.92rem;
+    line-height: 1.2; margin: 0;
+}
+.ai-chat-subtitle {
+    color: rgba(255,255,255,0.75); font-size: 0.68rem;
+    margin: 0; line-height: 1.3;
+}
+.ai-status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    flex-shrink: 0;
+}
+
+.ai-advisory-banner {
+    background: rgba(251,191,36,0.12);
+    border-bottom: 1px solid rgba(251,191,36,0.3);
+    padding: 6px 14px;
+    font-size: 0.68rem;
+    color: #92400e;
+    display: flex; align-items: center; gap: 5px;
+}
+
+.ai-session-bar {
+    padding: 6px 14px;
+    border-bottom: 1px solid rgba(128,128,128,0.1);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.65rem; opacity: 0.55;
+}
+
+.chat-scroll {
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto; max-height: 48vh;
+}
+.chat-scroll::-webkit-scrollbar { width: 4px; }
+.chat-scroll::-webkit-scrollbar-thumb {
+    background: rgba(128,128,128,0.25); border-radius: 4px;
+}
+
+.msg-row-user      { display: flex; justify-content: flex-end; gap: 8px; align-items: flex-end; }
+.msg-row-assistant { display: flex; justify-content: flex-start; gap: 8px; align-items: flex-end; }
+
+.msg-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; flex-shrink: 0;
+}
+.msg-avatar-user { background: #AA000022; border: 1px solid #AA000033; }
+.msg-avatar-bot  { background: linear-gradient(135deg,#AA0000,#e05500); color: #fff; }
+
+.msg-bubble-wrap      { display: flex; flex-direction: column; max-width: 85%; }
+.msg-bubble-wrap-user { align-items: flex-end; }
+.msg-bubble-wrap-bot  { align-items: flex-start; }
+
+.chat-bubble-user {
+    background: linear-gradient(135deg, #AA0000 0%, #cc3300 100%);
+    color: #fff;
+    border-radius: 16px 16px 4px 16px;
+    padding: 9px 13px;
+    font-size: 0.83rem; line-height: 1.45;
+    box-shadow: 0 2px 8px rgba(170,0,0,0.2);
+}
+.chat-bubble-assistant {
+    background: rgba(128,128,128,0.07);
+    border: 1px solid rgba(128,128,128,0.15);
+    border-radius: 16px 16px 16px 4px;
+    padding: 9px 13px;
+    font-size: 0.83rem; line-height: 1.45;
+}
+.msg-meta {
+    font-size: 0.6rem; opacity: 0.45;
+    margin-top: 3px; padding: 0 4px;
+}
+
+.chat-empty-state {
+    text-align: center; padding: 28px 16px; opacity: 0.5;
+}
+.chat-empty-icon { font-size: 2rem; margin-bottom: 6px; }
+.chat-empty-text { font-size: 0.78rem; line-height: 1.5; }
+
+/* Chips — only rendered in fullscreen, but style defined globally */
+.suggestion-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 14px 4px;
+}
+.chip {
+    background: rgba(170,0,0,0.07);
+    border: 1px solid rgba(170,0,0,0.2);
+    border-radius: 20px; padding: 4px 11px;
+    font-size: 0.7rem; color: #AA0000;
+    cursor: pointer; white-space: nowrap;
+}
+
+/* ── Governance cards ── */
+.gov-card {
+    border: 1px solid rgba(128,128,128,0.2); border-radius: 10px;
+    padding: 1rem 1.2rem; margin-bottom: 0.8rem;
+}
+.gov-alert-critical {
+    background: #fff5f5; border-left: 4px solid #e53e3e;
+    padding: 0.8rem 1rem; border-radius: 6px; margin: 0.5rem 0;
+}
+.gov-alert-warning {
+    background: #fffbeb; border-left: 4px solid #d97706;
+    padding: 0.8rem 1rem; border-radius: 6px; margin: 0.5rem 0;
+}
+.gov-alert-pass {
+    background: #f0fdf4; border-left: 4px solid #16a34a;
+    padding: 0.8rem 1rem; border-radius: 6px; margin: 0.5rem 0;
+}
+.bench-title {
+    text-align: center; font-size: 1.05rem; font-weight: 600;
+    color: #AA0000; margin: 1.2rem 0 0.8rem; letter-spacing: 0.02em;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Logo ─────────────────────────────────────────────────────────────
-def get_logo_b64():
-    p = os.path.join(_HERE, "49ers_logo.png")
-    if os.path.exists(p):
-        with open(p, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    return None
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTH GATE
+# ─────────────────────────────────────────────────────────────────────────────
+logo_paths = [
+    Path("49ers_logo.png"), Path("logo.png"), Path("assets/logo.png"),
+    Path("static/logo.png"), Path("images/logo.png"),
+]
+render_auth_page(logo_paths=logo_paths)
 
-def render_logo(width=110, shape="circle"):
-    b64 = get_logo_b64()
-    if b64:
-        r = "50%" if shape == "circle" else "12px"
-        st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem;">'
-                    f'<img src="data:image/png;base64,{b64}" width="{width}" '
-                    f'style="border-radius:{r};"/></div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div style="text-align:center;font-size:1.2rem;font-weight:bold;'
-                    'color:#f5a623;margin-bottom:1rem;">49ers Intelligence Lab</div>',
-                    unsafe_allow_html=True)
+role     = st.session_state.role
+username = st.session_state.username
+fire_data, fire_source, fire_label = load_fire_data()
 
-# ── Auth ─────────────────────────────────────────────────────────────
-CREDENTIALS = {
-    "dispatcher": {"password":"fire2025","role":"emergency_worker","display":"Emergency Evacuator"},
-    "caregiver":  {"password":"evacuate","role":"evacuee",         "display":"Caregiver / Evacuee"},
-    "analyst":    {"password":"datathon","role":"analyst",         "display":"Data Analyst"},
-}
+# ─────────────────────────────────────────────────────────────────────────────
+# SESSION STATE INITIALIZATION
+# ─────────────────────────────────────────────────────────────────────────────
+if "show_ai_panel" not in st.session_state:
+    st.session_state.show_ai_panel = True
+if "ai_fullscreen" not in st.session_state:
+    st.session_state.ai_fullscreen = False
+if "ai_messages" not in st.session_state:
+    st.session_state.ai_messages = []
+if "ai_show_history" not in st.session_state:
+    st.session_state.ai_show_history = False
+if "ai_session_start" not in st.session_state:
+    st.session_state.ai_session_start = datetime.now().isoformat()
 
-ROLE_PAGES = {
-    "emergency_worker": ["Command Dashboard","AI Assistant"],
-    "evacuee":          ["Start Here","Evacuation Planner","Safe Routes & Transit","AI Assistant"],
-    "analyst":          ["Dashboard","Equity Analysis","Risk Calculator",
-                         "Impact Projection","AI Assistant","About"],
-}
+# ─────────────────────────────────────────────────────────────────────────────
+# CHAT HISTORY PERSISTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+HISTORY_DIR = src_dir / ".chat_history"
+HISTORY_DIR.mkdir(exist_ok=True)
 
-ROLE_COLORS = {
-    "emergency_worker":"#ff4b4b",
-    "evacuee":"#4b9fff",
-    "analyst":"#4bff9f",
-}
+def _history_path(uname: str) -> Path:
+    safe = "".join(c for c in uname if c.isalnum() or c in "-_")
+    return HISTORY_DIR / f"{safe}.json"
 
-SYSTEM_PROMPTS = {
-    "emergency_worker": """You are EVAC-OPS, an AI command assistant for emergency evacuation
-coordinators in the 49ers Intelligence Lab Wildfire Evacuation System.
-CAPABILITIES: CDC SVI vulnerable-population data, wildfire perimeter/zone data (A/B/C),
-USFA Fire Department Registry (staffing/stations), geospatial hotspot detection,
-survival analysis evacuation probability outputs.
-STYLE: Terse, direct, action-oriented. Status: EVACUATED/IN PROGRESS/UNACCOUNTED/SHELTER-IN-PLACE.
-Flag oxygen/wheelchair/dialysis as PRIORITY RED. Draft SITREPs on request. Label demo data [DEMO DATA].""",
+def load_chat_history(uname: str) -> list:
+    p = _history_path(uname)
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
 
-    "evacuee": """You are SAFE-PATH, a calm friendly AI helping evacuees and caregivers
-during a wildfire emergency. Part of the 49ers Intelligence Lab system.
-HELP WITH: Step-by-step evacuation, zone meanings (A=leave NOW/B=ready/C=monitor),
-nearest accessible shelter, caregiver guidance (mobility, oxygen, dialysis, dementia,
-children with disabilities), go-bag checklist, registering for assistance.
-STYLE: Warm, calm, plain language, numbered steps. If immediate danger: call 911 first.
-Label demo data [DEMO DATA].""",
-
-    "analyst": """You are DATA-LAB, technical AI for data scientists on the 49ers Intelligence Lab
-WiDS Datathon 2025 project (2nd place): Wildfire Evacuation Alert System.
-STACK: Python, Streamlit, CDC SVI 2022, GOES-16/17, Census shapefiles.
-MODELS: Cox Proportional Hazards survival analysis, Getis-Ord Gi* hotspot detection,
-alert classification triage. NEW: USFA Fire Department Registry (locations, staffing, stations).
-HELP WITH: methodology, feature engineering, model improvements, SVI interpretation,
-code review, judge explanations, literature suggestions.
-STYLE: Technical, rigorous, proactive about limitations.""",
-}
-
-# ── Data loaders ─────────────────────────────────────────────────────
-@st.cache_data
-def load_usfa_data():
-    for p in [os.path.realpath(c) for c in [
-        os.path.join(_HERE, "usfa-registry-national.csv"),
-        os.path.join(_HERE, "..", "usfa-registry-national.csv"),
-        "usfa-registry-national.csv",
-    ]]:
-        if os.path.exists(p):
-            try:
-                df = pd.read_csv(p, dtype=str)
-                df.columns = df.columns.str.strip()
-                for col in ['Number Of Stations','Active Firefighters - Career',
-                            'Active Firefighters - Volunteer','Active Firefighters - Paid per Call']:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-                return df
-            except Exception as e:
-                st.sidebar.warning(f"USFA load error: {e}")
-    return None
-
-@st.cache_data
-def load_exact_county_coordinates():
-    for p in [os.path.realpath(c) for c in [
-        os.path.join(_HERE,"..","..","..","wids-caregiver-alert","data","CenPop2020_Mean_CO.txt"),
-        os.path.join(_HERE,"..","data","CenPop2020_Mean_CO.txt"),
-        os.path.join(_HERE,"data","CenPop2020_Mean_CO.txt"),
-        "data/CenPop2020_Mean_CO.txt",
-    ]]:
-        if os.path.exists(p):
-            try:
-                df = pd.read_csv(p, dtype={"STATEFP":str,"COUNTYFP":str})
-                return {str(r["STATEFP"]).zfill(2)+str(r["COUNTYFP"]).zfill(3):
-                        (float(r["LATITUDE"]),float(r["LONGITUDE"])) for _,r in df.iterrows()}
-            except Exception:
-                pass
-    return None
-
-@st.cache_data
-def load_state_coordinates():
-    return {'01':(32.81,-86.79),'02':(61.37,-152.40),'04':(33.73,-111.43),'05':(34.97,-92.37),
-            '06':(36.12,-119.68),'08':(39.06,-105.31),'09':(41.60,-72.76),'10':(39.32,-75.51),
-            '12':(27.77,-81.69),'13':(33.04,-83.64),'15':(21.09,-157.50),'16':(44.24,-114.48),
-            '17':(40.35,-88.99),'18':(39.85,-86.26),'19':(42.01,-93.21),'20':(38.53,-96.73),
-            '21':(37.67,-84.67),'22':(31.17,-91.87),'23':(44.69,-69.38),'24':(39.06,-76.80),
-            '25':(42.23,-71.53),'26':(43.33,-84.54),'27':(45.69,-93.90),'28':(32.74,-89.68),
-            '29':(38.46,-92.29),'30':(46.92,-110.45),'31':(41.13,-98.27),'32':(38.31,-117.06),
-            '33':(43.45,-71.56),'34':(40.30,-74.52),'35':(34.84,-106.25),'36':(42.17,-74.95),
-            '37':(35.63,-79.81),'38':(47.53,-99.78),'39':(40.39,-82.76),'40':(35.57,-96.93),
-            '41':(44.57,-122.07),'42':(40.59,-77.21),'44':(41.68,-71.51),'45':(33.86,-80.95),
-            '46':(44.30,-99.44),'47':(35.75,-86.69),'48':(31.05,-97.56),'49':(40.15,-111.86),
-            '50':(44.05,-72.71),'51':(37.77,-78.17),'53':(47.40,-121.49),'54':(38.49,-80.95),
-            '55':(44.27,-89.62),'56':(42.76,-107.30),'11':(38.90,-77.03)}
-
-@st.cache_data
-def load_vulnerable_populations():
-    for p in [os.path.realpath(c) for c in [
-        os.path.join(_HERE,"..","..","..","01_raw_data","external","SVI_2022_US_county.csv"),
-        os.path.join(_HERE,"..","..","01_raw_data","external","SVI_2022_US_county.csv"),
-        os.path.join(_HERE,"..","01_raw_data","external","SVI_2022_US_county.csv"),
-        "01_raw_data/external/SVI_2022_US_county.csv",
-        os.path.join(_HERE,"..","data","SVI_2022_US_county.csv"),
-        "data/SVI_2022_US_county.csv",
-    ]]:
-        if os.path.exists(p):
-            try:
-                svi = pd.read_csv(p)
-                vulnerable = svi[svi['RPL_THEMES']>=0.75].copy()
-                ec = load_exact_county_coordinates()
-                sc = load_state_coordinates()
-                def gc(fips):
-                    if ec:
-                        c=ec.get(str(int(fips)).zfill(5))
-                        if c: return c
-                    try: return sc.get(str(int(fips))[:2].zfill(2),(39.83,-98.58))
-                    except: return (39.83,-98.58)
-                vulnerable['lat']=vulnerable['FIPS'].apply(lambda x:gc(x)[0])
-                vulnerable['lon']=vulnerable['FIPS'].apply(lambda x:gc(x)[1])
-                pops={f"{r['COUNTY']}, {r['STATE']}":{'lat':r['lat'],'lon':r['lon'],
-                      'vulnerable_count':max(int(r.get('E_AGE65',0)+r.get('E_POV150',0)*0.5),100),
-                      'svi_score':float(r['RPL_THEMES'])} for _,r in vulnerable.iterrows()}
-                df=pd.DataFrame.from_dict(pops,orient='index').sort_values('svi_score',ascending=False).head(200)
-                return df.to_dict('index')
-            except Exception as e:
-                st.sidebar.error(f"SVI error: {e}")
-    return {'Los Angeles County, CA':{'lat':34.05,'lon':-118.24,'vulnerable_count':523,'svi_score':0.95},
-            'Harris County, TX':{'lat':29.76,'lon':-95.37,'vulnerable_count':498,'svi_score':0.91},
-            'Miami-Dade County, FL':{'lat':25.76,'lon':-80.19,'vulnerable_count':510,'svi_score':0.93}}
-
-@st.cache_data
-def load_wids_analysis_data():
-    for p in [os.path.realpath(c) for c in [
-        os.path.join(_HERE,"fire_events_with_svi_and_delays.csv"),
-        os.path.join(_HERE,"..","..","..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
-        os.path.join(_HERE,"..","..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
-        os.path.join(_HERE,"..","01_raw_data","processed","fire_events_with_svi_and_delays.csv"),
-        "01_raw_data/processed/fire_events_with_svi_and_delays.csv",
-    ]]:
-        if os.path.exists(p):
-            try: return pd.read_csv(p)
-            except: pass
-    return None
-
-@st.cache_data(ttl=300)
-def load_fire_data():
-    return get_all_us_fires(days=1)
-
-# ── Login ─────────────────────────────────────────────────────────────
-def render_login():
-    col1, col2, col3 = st.columns([1,1.1,1])
-    with col2:
-        b64 = get_logo_b64()
-        if b64:
-            st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem;">'
-                        f'<img src="data:image/png;base64,{b64}" width="280" '
-                        f'style="border-radius:12px;"/></div>', unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align:center;color:#f5a623;'>Wildfire Evacuation Alert System</h2>",
-                    unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;color:#aaa;margin-bottom:1.5rem;'>"
-                    "49ers Intelligence Lab  ·  WiDS Datathon 2025</p>", unsafe_allow_html=True)
-        st.divider()
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Sign In", use_container_width=True, type="primary"):
-            if username in CREDENTIALS and CREDENTIALS[username]["password"] == password:
-                st.session_state.logged_in    = True
-                st.session_state.username     = username
-                st.session_state.role         = CREDENTIALS[username]["role"]
-                st.session_state.role_display = CREDENTIALS[username]["display"]
-                st.session_state.chat_messages = []
-                st.session_state.page = {"emergency_worker":"Command Dashboard",
-                                         "evacuee":"Start Here","analyst":"Dashboard"}[st.session_state.role]
-                st.rerun()
-            else:
-                st.error("Invalid credentials.")
-        st.divider()
-        st.caption("Demo credentials:")
-        st.caption("Emergency Worker:  `dispatcher` / `fire2025`")
-        st.caption("Caregiver/Evacuee: `caregiver` / `evacuate`")
-        st.caption("Data Analyst:      `analyst` / `datathon`")
-
-# ── AI Assistant ──────────────────────────────────────────────────────
-def render_chatbot(role):
-    labels = {"emergency_worker":"EVAC-OPS  |  Command & Dispatch Assistant",
-              "evacuee":"SAFE-PATH  |  Evacuation Guidance & Caregiver Support",
-              "analyst":"DATA-LAB  |  Technical & Research Assistant"}
-    placeholders = {"emergency_worker":"Enter command or query...",
-                    "evacuee":"Ask anything about evacuating safely...",
-                    "analyst":"Ask a technical question about the project..."}
-    quick_prompts = {
-        "emergency_worker":["Vulnerable populations in Zone A","Draft a SITREP for active fire",
-                            "Resources near fire perimeter","Flag PRIORITY RED individuals"],
-        "evacuee":["I need to evacuate right now — what do I do?","How do I evacuate with someone on oxygen?",
-                   "What should I pack in my go-bag?","Where is the nearest accessible shelter?"],
-        "analyst":["Explain the Cox survival analysis model","How should I interpret RPL_THEMES in SVI?",
-                   "How can the USFA registry improve the model?","Suggest improvements to the alert classifier"],
-    }
-    color = ROLE_COLORS[role]
-    st.markdown(f"<h2 style='color:{color}'>AI Assistant</h2>", unsafe_allow_html=True)
-    st.caption(labels[role])
-    st.divider()
-    st.markdown("**Quick prompts:**")
-    cols = st.columns(2)
-    for i, qp in enumerate(quick_prompts[role]):
-        if cols[i%2].button(qp, key=f"qp_{i}", use_container_width=True):
-            st.session_state.chat_messages.append({"role":"user","content":qp})
-            st.rerun()
-    st.divider()
-    for msg in st.session_state.chat_messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-    msgs = st.session_state.chat_messages
-    if msgs and msgs[-1]["role"]=="user" and (len(msgs)==1 or msgs[-2]["role"]!="user"):
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-                    response = client.messages.create(model="claude-sonnet-4-6", max_tokens=1024,
-                                                      system=SYSTEM_PROMPTS[role],
-                                                      messages=st.session_state.chat_messages)
-                    reply = response.content[0].text
-                except Exception as e:
-                    reply = f"API error: {e}"
-            st.write(reply)
-        st.session_state.chat_messages.append({"role":"assistant","content":reply})
-        st.rerun()
-    if prompt := st.chat_input(placeholders[role]):
-        st.session_state.chat_messages.append({"role":"user","content":prompt})
-        st.rerun()
-    if st.session_state.chat_messages:
-        if st.button("Clear conversation", key="clear_chat"):
-            st.session_state.chat_messages = []
-            st.rerun()
-
-# ── Command Dashboard (Emergency Worker) ─────────────────────────────
-def render_command_dashboard(fire_data, vulnerable_populations, usfa_data):
-    st.markdown('<h1 class="main-header">Command Dashboard</h1>', unsafe_allow_html=True)
-
+def save_chat_history(uname: str, sessions: list) -> None:
+    p = _history_path(uname)
     try:
-        fire_stats = get_fire_statistics(fire_data)
-    except:
-        fire_stats = {'total_fires': 0, 'named_fires': 0, 'total_acres': 0}
+        p.write_text(json.dumps(sessions[-10:], ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
-    insights = load_real_insights()
+def _build_sessions_snapshot() -> list:
+    past = load_chat_history(username)
+    current_sid_prefix = st.session_state.get("ai_session_start", "")[:8]
+    past = [s for s in past if not s.get("session_id", "").startswith(current_sid_prefix)]
+    past.append({
+        "session_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "started_at": st.session_state.get("ai_session_start", datetime.now().isoformat()),
+        "role": role,
+        "messages": st.session_state.ai_messages,
+    })
+    return past
 
-    # Live fire metrics
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Fires (24h)",  fire_stats.get('total_fires', 0))
-    c2.metric("Named Fires",         fire_stats.get('named_fires', 0))
-    c3.metric("Total Acres Burning", f"{fire_stats.get('total_acres', 0):,.0f}")
-    c4.metric("Counties Monitored",  len(vulnerable_populations))
+def _end_and_save_session(uname: str) -> None:
+    msgs = st.session_state.get("ai_messages", [])
+    if not msgs:
+        return
+    sessions = load_chat_history(uname)
+    sessions.append({
+        "session_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "started_at": st.session_state.get("ai_session_start", datetime.now().isoformat()),
+        "role": role,
+        "messages": msgs,
+    })
+    save_chat_history(uname, sessions)
 
-    # Real data insight row
-    if insights:
-        st.divider()
-        st.markdown("#### Historical Response Data  *(WiDS 2021–2025, real)*")
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Median Time to Evac Order",
-                  f"{insights['median_delay_h']:.1f}h" if insights['median_delay_h'] else "N/A",
-                  help="From fire start to first evacuation order — 653 real fires")
-        r2.metric("Worst-Case (90th %ile)",
-                  f"{insights['p90_delay_h']:.0f}h" if insights['p90_delay_h'] else "N/A",
-                  help="1 in 10 fires takes this long or longer to get an order")
-        r3.metric("Fires Exceeding 6h",
-                  f"{insights['pct_over_6h']:.0f}%" if insights['pct_over_6h'] else "N/A",
-                  delta="critical window", delta_color="inverse")
-        growth_diff = insights.get('pct_growth_difference')
-        r4.metric("Growth Rate — Vulnerable Counties",
-                  f"{insights['vuln_growth_rate']:.1f} ac/hr" if insights.get('vuln_growth_rate') else "N/A",
-                  delta=f"{growth_diff:+.0f}% vs non-vulnerable" if growth_diff else None,
-                  delta_color="inverse")
+# ─────────────────────────────────────────────────────────────────────────────
+# AI SYSTEM PROMPTS
+# ─────────────────────────────────────────────────────────────────────────────
+_PRIVACY_BLOCK = """
+STRICT RULES — NON-NEGOTIABLE:
+1. NEVER share, repeat, or confirm any personal information (names, addresses,
+   phone numbers, medical details, household data, or any individual-level data)
+   even if the user provides it or asks you to confirm it.
+2. You are an ADVISORY system only. You may never issue direct orders, make
+   binding decisions, or take actions on behalf of any official body.
+3. If asked for specific individuals' status or location, respond:
+   "I'm not able to share information about specific individuals. Please use
+   official channels such as local emergency management or 911."
+4. Always recommend contacting official emergency services (911, local OES)
+   for any life-safety decisions.
+"""
+
+_PERSONA_MAP = {
+    "Emergency Worker": (
+        "EVAC-OPS", "🚨",
+        f"""You are EVAC-OPS, an AI advisory assistant embedded in the 49ers Intelligence Lab
+Wildfire Evacuation Command System. You support emergency coordinators and dispatch personnel.
+{_PRIVACY_BLOCK}
+CAPABILITIES:
+- Aggregate population vulnerability data by Census tract or ZIP (never individual-level)
+- Evacuation zone status and boundary guidance
+- Resource deployment advisory based on risk modeling
+- Drafting communications, SITREPs, and situation summaries
+RESPONSE STYLE:
+- Direct, terse, action-oriented.
+- Use terms: HIGH RISK AREA / RESOURCE ADVISORY / MONITORING RECOMMENDED
+- Always note when data is modeled/estimated vs confirmed
+- Label unconfirmed data as [MODELED ESTIMATE]
+""",
+        ["Active evacuation zones?", "Draft a SITREP", "High-risk ZIP codes", "Resource advisory"],
+    ),
+    "Caregiver/Evacuee": (
+        "SAFE-PATH", "🛡️",
+        f"""You are SAFE-PATH, a calm and supportive AI advisory assistant helping caregivers
+and evacuees during wildfire emergencies. You are part of the 49ers Intelligence Lab system.
+{_PRIVACY_BLOCK}
+PURPOSE: Help everyday people understand evacuation zones, what to do, and how to prepare —
+especially those caring for elderly, disabled, or medically dependent family members.
+ADVISORY GUIDANCE AREAS:
+- Evacuation zone explanations (Zone A = leave NOW, Zone B = prepare, Zone C = monitor)
+- Go-bag preparation: medications, documents, chargers, water, pet supplies
+- How to request evacuation assistance for mobility-limited individuals
+- Nearest shelter categories and how to find them via official sources
+- Caregiver-specific planning for medical equipment, oxygen, dialysis needs
+RESPONSE STYLE:
+- Plain language, numbered steps, warm and calm tone.
+- If someone describes immediate danger: advise them to call 911 first, immediately.
+""",
+        ["What's in a go-bag?", "Zone A vs Zone B", "Help for wheelchair users", "Nearest shelter"],
+    ),
+    "Data Analyst": (
+        "DATA-LAB", "🔬",
+        f"""You are DATA-LAB, a technical AI advisory assistant for data scientists and analysts
+working on the 49ers Intelligence Lab WiDS 2025 project: Wildfire Evacuation Alert System.
+{_PRIVACY_BLOCK}
+PROJECT CONTEXT:
+- Predicts evacuation risk for vulnerable populations during wildfires
+- Key stats: median delay 1.1h, P90 delay 32h, 653 fires with evac actions,
+  39.8% in high-SVI counties, 17% faster growth in vulnerable counties
+- Stack: Python, Streamlit, Supabase, Cox survival analysis, Getis-Ord Gi* hotspot detection
+DATA GOVERNANCE:
+- 7-table schema: geo_events, fire_perimeters, evac_zones, regions, 3 changelog tables
+- Critical: only use fire_perimeters where approval_status = 'approved'
+- Quality thresholds: containment 0–100%, lat/lng non-null for mapping
+RESPONSE STYLE:
+- Technical, precise, collaborative. Flag limitations and assumptions proactively.
+""",
+        ["Cox model AUC?", "SVI correlation query", "Hotspot detection code", "Data schema help"],
+    ),
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────────────────────────────────────
+with st.sidebar:
+    for lp in logo_paths:
+        if lp.exists():
+            _, img_col, _ = st.columns([1, 2, 1])
+            with img_col:
+                st.image(str(lp), use_container_width=True)
+            break
+    else:
+        st.markdown("<div style='text-align:center;font-size:2rem'>🔥</div>", unsafe_allow_html=True)
+
+    st.markdown(
+        "<div class='brand-block'>"
+        "<div class='brand-name'>49ers Intelligence Lab</div>"
+        "<div class='brand-sub'>WiDS Datathon 2025</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    rc = {"Emergency Worker": "#AA0000", "Caregiver/Evacuee": "#3d7be8", "Data Analyst": "#7b5ea7"}.get(role, "#555")
+    st.markdown(
+        f"<div style='text-align:center;margin-bottom:0.4rem'>"
+        f"<span class='role-badge' style='background:{rc}22;color:{rc};border:1px solid {rc}44'>{role}</span>"
+        f"<span style='font-size:0.78rem;color:#8892a4'>{username}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    render_user_profile_sidebar(username)
+    st.divider()
+
+    n_fires = len(fire_data)
+    st.markdown(
+        f"**Incident Feed:** {fire_label}  \n"
+        f"{'— ' + str(n_fires) + ' US hotspots (24 h)' if n_fires > 0 else '— No active incidents'}",
+        help="Green = WiDS local geo_events  ·  Yellow = NASA FIRMS live  ·  Grey = unavailable",
+    )
+    st.divider()
+
+    # ── Navigation ────────────────────────────────────────────────────────────
+    if role == "Emergency Worker":
+        pages = ["Command Dashboard", "Fire Predictor"]
+    elif role == "Caregiver/Evacuee":
+        pages = ["Start Here", "Evacuation Planner"]
+    else:
+        pages = [
+            "About", "Equity Analysis", "Risk Calculator",
+            "Impact Projection", "Coverage Analysis",
+            "Zone Duration", "Fire Predictor", "Data Governance",
+        ]
+
+    if "current_page" not in st.session_state or st.session_state.current_page not in pages:
+        st.session_state.current_page = pages[0]
+
+    for p in pages:
+        active = st.session_state.current_page == p
+        if st.button(p, key=f"nav_{p}", use_container_width=True,
+                     type="primary" if active else "secondary"):
+            st.session_state.current_page = p
+            log_page_visit(username, p)
+            st.rerun()
 
     st.divider()
 
-    # Map + alerts
-    col_map, col_alerts = st.columns([2, 1])
-    with col_map:
-        st.subheader("Active Fires & Vulnerable Populations")
-        if GEO_MAP_AVAILABLE:
-            render_map_with_controls(vulnerable_populations, fire_data, height=460)
-        else:
-            m = folium.Map(location=[39.83, -98.58], zoom_start=4)
-            if len(fire_data) > 0:
-                df = fire_data.nlargest(100, 'acres') if 'acres' in fire_data.columns else fire_data.head(100)
-                for _, fire in df.iterrows():
-                    acres = fire.get('acres', 0)
-                    folium.Circle(
-                        location=[fire['latitude'], fire['longitude']],
-                        radius=min(max(acres * 50, 20000), 100000),
-                        color='red', fill=True, fillColor='orange', fillOpacity=0.4,
-                        popup=f"<b>{fire.get('fire_name','Unknown')}</b><br>{acres:,.0f} acres"
-                    ).add_to(m)
-            st_folium(m, width=None, height=460)
+    if not st.session_state.show_ai_panel:
+        if st.button("Open AI Assistant", key="ai_open_btn", use_container_width=True):
+            st.session_state.show_ai_panel = True
+            st.rerun()
 
-    with col_alerts:
-        st.subheader("Proximity Alerts")
-        if len(fire_data) > 0:
-            alerts = find_nearby_fires(fire_data, vulnerable_populations, radius_km=80)
-            if alerts:
-                df_a = pd.DataFrame(alerts)[['Location','Fire_Name','Distance_mi','Fire_Acres']].head(15)
-                df_a.columns = ['Location','Fire','Dist (mi)','Acres']
-                st.warning(f"⚠️ {len(alerts)} ACTIVE ALERTS")
-                st.dataframe(df_a, hide_index=True, use_container_width=True)
+    st.divider()
+    if st.button("Sign Out", key="sign_out_btn", use_container_width=True):
+        _end_and_save_session(username)
+        sign_out(username)
+        st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PAGE FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+def _render_about():
+    st.markdown("<div class='about-centered'>", unsafe_allow_html=True)
+    st.title("49ers Intelligence Lab")
+    st.caption("WiDS Datathon 2025 · Wildfire Caregiver Alert System")
+    st.markdown("""
+**Research Question:** Do vulnerable populations experience systematically longer
+evacuation delays during wildfires, and can a data-driven alert system reduce those delays?
+""")
+    st.markdown("### Key Findings (WiDS 2021–2025)")
+    st.markdown("""
+| Metric | Value |
+|--------|-------|
+| Fires analyzed | 62,696 |
+| With confirmed evacuation actions | 653 |
+| Median time to evacuation order | **1.1 hours** |
+| 90th-percentile delay | **32 hours** |
+| High-SVI fire events | **39.8%** |
+| Growth rate — vulnerable counties | **11.71 ac/hr (+17%)** |
+""")
+    st.markdown("### Data Sources")
+    st.markdown("Genasys Protect · CDC SVI 2022 · NASA FIRMS · NIFC · USFA · FEMA IPAWS")
+    st.markdown("### Team")
+    st.markdown("49ers Intelligence Lab · UNC Charlotte · WiDS Datathon 2025")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENHANCED AI PANEL
+# is_fullscreen : show suggestion chips
+# show_border   : inject .ai-col-marker sentinel so CSS applies the border
+# ─────────────────────────────────────────────────────────────────────────────
+def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: bool = False):
+    persona_name, persona_emoji, system_prompt, suggestions = _PERSONA_MAP.get(
+        role, ("Assistant", "🤖", "You are a wildfire evacuation advisory assistant.", [])
+    )
+
+    msgs = st.session_state.ai_messages
+    msg_count = len(msgs)
+    session_start = st.session_state.get("ai_session_start", "")
+    try:
+        start_fmt = datetime.fromisoformat(session_start).strftime("%-I:%M %p")
+    except Exception:
+        start_fmt = "—"
+
+    # ── Sentinel div — invisible zero-height element that CSS :has() detects ──
+    # This is what triggers the border on the parent stColumn without wrapping
+    # Streamlit widgets in a broken HTML div.
+    if show_border:
+        st.markdown("<div class='ai-col-marker' style='height:0;overflow:hidden'></div>",
+                    unsafe_allow_html=True)
+
+    # ── Header controls row ───────────────────────────────────────────────────
+    hdr_left, hdr_mid, hdr_right = st.columns([4, 2, 2])
+    with hdr_left:
+        st.markdown(
+            f"<div style='padding-top:4px;font-weight:700;font-size:0.9rem'>"
+            f"{persona_emoji} AI Assistant"
+            f"<span style='font-size:0.68rem;font-weight:400;opacity:0.6;margin-left:6px'>"
+            f"{persona_name}</span></div>",
+            unsafe_allow_html=True,
+        )
+    with hdr_mid:
+        fs_label = "Exit Full" if st.session_state.ai_fullscreen else "⛶ Expand"
+        if st.button(fs_label, key="ai_fs_inline", use_container_width=True):
+            st.session_state.ai_fullscreen = not st.session_state.ai_fullscreen
+            st.rerun()
+    with hdr_right:
+        if st.button("✕ Close", key="ai_close_inline", use_container_width=True):
+            _end_and_save_session(username)
+            st.session_state.show_ai_panel = False
+            st.session_state.ai_fullscreen = False
+            st.rerun()
+
+    # ── Gradient header card ──────────────────────────────────────────────────
+    st.markdown(
+        f"""<div class="ai-chat-card">
+          <div class="ai-chat-header">
+            <div class="ai-chat-avatar-bot">{persona_emoji}</div>
+            <div class="ai-chat-header-text">
+              <div class="ai-chat-title">{persona_name}</div>
+              <div class="ai-chat-subtitle">49ers Intelligence Lab · Advisory Only</div>
+            </div>
+            <div class="ai-status-dot" title="Online"></div>
+          </div>
+          <div class="ai-advisory-banner">
+            ⚠️ Advisory guidance only — not a substitute for 911 or official emergency services
+          </div>
+          <div class="ai-session-bar">
+            <span>Session started {start_fmt}</span>
+            <span>{msg_count} message{'s' if msg_count != 1 else ''} this session</span>
+          </div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # ── Suggestion chips — FULLSCREEN ONLY ───────────────────────────────────
+    if is_fullscreen and not msgs and suggestions:
+        chips_html = "".join(f"<span class='chip'>{s}</span>" for s in suggestions)
+        st.markdown(
+            f"<div style='margin-bottom:6px;font-size:0.7rem;opacity:0.55'>"
+            f"Suggested questions:</div>"
+            f"<div class='suggestion-chips'>{chips_html}</div>",
+            unsafe_allow_html=True,
+        )
+        chip_cols = st.columns(len(suggestions))
+        for i, (col, suggestion) in enumerate(zip(chip_cols, suggestions)):
+            with col:
+                if st.button(suggestion, key=f"chip_{i}", use_container_width=True,
+                             help=f"Ask: {suggestion}"):
+                    st.session_state.ai_messages.append({
+                        "role": "user", "content": suggestion,
+                        "ts": datetime.now().strftime("%H:%M"),
+                    })
+                    try:
+                        import anthropic
+                        client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                        api_msgs = [{"role": m["role"], "content": m["content"]}
+                                    for m in st.session_state.ai_messages]
+                        resp = client.messages.create(
+                            model="claude-sonnet-4-6", max_tokens=700,
+                            system=system_prompt, messages=api_msgs,
+                        )
+                        reply = resp.content[0].text
+                    except Exception as e:
+                        reply = f"Error: {e}"
+                    st.session_state.ai_messages.append({
+                        "role": "assistant", "content": reply,
+                        "ts": datetime.now().strftime("%H:%M"),
+                    })
+                    save_chat_history(username, _build_sessions_snapshot())
+                    st.rerun()
+
+    # ── Message bubbles ───────────────────────────────────────────────────────
+    if msgs:
+        msgs_html = ""
+        for m in msgs[-40:]:
+            ts      = m.get("ts", "")
+            content = m["content"].replace("\n", "<br>")
+            if m["role"] == "user":
+                msgs_html += f"""
+                <div class="msg-row-user">
+                  <div class="msg-bubble-wrap msg-bubble-wrap-user">
+                    <div class="chat-bubble-user">{content}</div>
+                    <div class="msg-meta">{ts}</div>
+                  </div>
+                  <div class="msg-avatar msg-avatar-user">👤</div>
+                </div>"""
             else:
-                st.success("✅ No proximity alerts.")
+                msgs_html += f"""
+                <div class="msg-row-assistant">
+                  <div class="msg-avatar msg-avatar-bot">{persona_emoji}</div>
+                  <div class="msg-bubble-wrap msg-bubble-wrap-bot">
+                    <div class="chat-bubble-assistant">{content}</div>
+                    <div class="msg-meta">{persona_name} · {ts}</div>
+                  </div>
+                </div>"""
+        st.markdown(f"<div class='chat-scroll'>{msgs_html}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(
+            f"<div class='chat-empty-state'>"
+            f"<div class='chat-empty-icon'>{persona_emoji}</div>"
+            f"<div class='chat-empty-text'>Hi! I'm <strong>{persona_name}</strong>.<br>"
+            f"Ask me anything about wildfire evacuation.<br>"
+            f"<span style='font-size:0.65rem;opacity:0.6'>"
+            f"All responses are advisory guidance only.</span></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-        if insights:
-            st.divider()
-            st.markdown("**Response Time Context**")
-            growth_line = (f"\n\n• Vulnerable counties: fires grow "
-                           f"**{insights['pct_growth_difference']:+.0f}%** faster"
-                           if insights.get('pct_growth_difference') else "")
-            st.info(
-                f"📊 Based on {insights['fires_with_evac']:,} historical fires:\n\n"
-                f"• Median time to order: **{insights['median_delay_h']:.1f}h**\n\n"
-                f"• 1 in 10 fires takes **{insights['p90_delay_h']:.0f}+ hours**"
-                + growth_line
+    # ── Input form ────────────────────────────────────────────────────────────
+    with st.form(key="ai_chat_form", clear_on_submit=True):
+        user_input = st.text_area(
+            "Message", height=80, placeholder=f"Ask {persona_name} a question…",
+            label_visibility="collapsed", key="ai_input_text",
+        )
+        send_col, clear_col = st.columns([3, 1])
+        with send_col:
+            send = st.form_submit_button("Send ➤", use_container_width=True, type="primary")
+        with clear_col:
+            clear = st.form_submit_button("Clear", use_container_width=True)
+
+    if clear:
+        _end_and_save_session(username)
+        st.session_state.ai_messages = []
+        st.session_state.ai_session_start = datetime.now().isoformat()
+        st.rerun()
+
+    if send and user_input.strip():
+        ts_now = datetime.now().strftime("%H:%M")
+        st.session_state.ai_messages.append({
+            "role": "user", "content": user_input.strip(), "ts": ts_now,
+        })
+        try:
+            import anthropic
+            client   = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+            api_msgs = [{"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.ai_messages]
+            resp     = client.messages.create(
+                model="claude-sonnet-4-6", max_tokens=700,
+                system=system_prompt, messages=api_msgs,
             )
+            reply = resp.content[0].text
+        except KeyError:
+            reply = "AI Assistant not configured. Add ANTHROPIC_API_KEY to .streamlit/secrets.toml."
+        except Exception as e:
+            reply = f"Error: {e}"
 
-        st.divider()
-        st.markdown("**Emergency Contacts**")
-        st.info("Fire: (704) 555-0100\nEvacuation: (704) 555-0200\n911: Emergency")
+        st.session_state.ai_messages.append({
+            "role": "assistant", "content": reply,
+            "ts": datetime.now().strftime("%H:%M"),
+        })
+        save_chat_history(username, _build_sessions_snapshot())
+        st.rerun()
 
-    st.divider()
-    st.subheader("Fire Department Resources  (USFA National Registry)")
+    # ── Past sessions history drawer ──────────────────────────────────────────
+    past_sessions = load_chat_history(username)
+    displayable = [s for s in past_sessions
+                   if not s.get("session_id", "").startswith(
+                       st.session_state.get("ai_session_start", "")[:8]
+                   )]
 
-    if usfa_data is not None and len(usfa_data) > 0:
-        f1, f2, f3 = st.columns(3)
-        states = sorted(usfa_data['HQ state'].dropna().unique()) if 'HQ state' in usfa_data.columns else []
-        with f1: sel_state = st.selectbox("Filter by State", ["All"] + list(states), key="usfa_state")
-        with f2: sel_type  = st.selectbox("Department Type", ["All","Career","Volunteer","Combination"], key="usfa_type")
-        with f3: primary   = st.checkbox("Primary Emergency Mgmt Only", key="usfa_primary")
-
-        filt = usfa_data.copy()
-        if sel_state != "All" and 'HQ state' in filt.columns:
-            filt = filt[filt['HQ state'].str.strip() == sel_state]
-        if sel_type != "All" and 'Dept Type' in filt.columns:
-            filt = filt[filt['Dept Type'].str.contains(sel_type, case=False, na=False)]
-        if primary and 'Primary agency for emergency mgmt' in filt.columns:
-            filt = filt[filt['Primary agency for emergency mgmt'].str.strip().str.lower() == 'yes']
-
-        st.caption(f"Showing {len(filt):,} of {len(usfa_data):,} departments")
-        m1, m2, m3, m4 = st.columns(4)
-        if 'Number Of Stations' in filt.columns:
-            m1.metric("Total Stations", f"{filt['Number Of Stations'].sum():,}")
-        if 'Active Firefighters - Career' in filt.columns:
-            m2.metric("Career FF", f"{filt['Active Firefighters - Career'].sum():,}")
-        if 'Active Firefighters - Volunteer' in filt.columns:
-            m3.metric("Volunteer FF", f"{filt['Active Firefighters - Volunteer'].sum():,}")
-        if 'Primary agency for emergency mgmt' in filt.columns:
-            m4.metric("Primary Mgmt Agencies",
-                      f"{(filt['Primary agency for emergency mgmt'].str.strip().str.lower()=='yes').sum():,}")
-
-        st.divider()
-        if 'Dept Type' in filt.columns and len(filt) > 0:
-            ch1, ch2 = st.columns(2)
-            with ch1:
-                tc = filt['Dept Type'].value_counts().reset_index()
-                tc.columns = ['Type','Count']
-                fig = px.bar(tc, x='Type', y='Count', title="Departments by Type",
-                             color='Count', color_continuous_scale='Reds')
-                fig.update_layout(height=300, showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
-            with ch2:
-                if 'HQ state' in filt.columns:
-                    sc = filt['HQ state'].value_counts().head(10).reset_index()
-                    sc.columns = ['State','Departments']
-                    fig2 = px.bar(sc, x='State', y='Departments', title="Top 10 States",
-                                  color='Departments', color_continuous_scale='Oranges')
-                    fig2.update_layout(height=300, showlegend=False)
-                    st.plotly_chart(fig2, use_container_width=True)
-
-        dcols = [c for c in ['Fire dept name','HQ city','HQ state','County','Dept Type',
-                              'Number Of Stations','Active Firefighters - Career',
-                              'Active Firefighters - Volunteer',
-                              'Primary agency for emergency mgmt'] if c in filt.columns]
-        st.dataframe(filt[dcols].head(200).reset_index(drop=True),
-                     use_container_width=True, hide_index=True)
-        if len(filt) > 200:
-            st.caption(f"Showing top 200 of {len(filt):,}. Use filters to narrow down.")
-    else:
-        st.warning("USFA registry not found. Place `usfa-registry-national.csv` in the `src/` folder.")
-
-    st.divider()
-    st.subheader("High-Priority Vulnerable Populations")
-    vp_df = pd.DataFrame.from_dict(vulnerable_populations, orient='index').reset_index()
-    vp_df.columns = ['Location','Lat','Lon','Vulnerable Count','SVI Score']
-    vp_df = vp_df.sort_values('SVI Score', ascending=False).head(20)
-    vp_df['SVI Score'] = vp_df['SVI Score'].round(3)
-    st.dataframe(vp_df[['Location','Vulnerable Count','SVI Score']],
-                 use_container_width=True, hide_index=True)
-
-
-# ── Start Here (Caregiver/Evacuee) ───────────────────────────────────
-def render_start_here(fire_data, vulnerable_populations):
-    insights = load_real_insights()
-
-    st.title("Wildfire Evacuation Decision Support")
-    st.markdown("### Know Your Risk. Act Early. Get Help.")
-    st.divider()
-
-    if insights and insights.get('vuln_growth_rate'):
-        st.error(
-            f"⚠️ **In high-vulnerability counties, fires grow at "
-            f"{insights['vuln_growth_rate']:.1f} acres/hour on average** — "
-            f"{insights.get('pct_growth_difference', 0):+.0f}% faster than lower-risk areas. "
-            f"Don't wait for an official order."
+    if displayable:
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        show_hist = st.toggle(
+            f"📂 Past sessions ({len(displayable)} saved)",
+            value=st.session_state.ai_show_history,
+            key="ai_hist_toggle",
         )
+        st.session_state.ai_show_history = show_hist
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown("**Evacuate Now**\n\nFind safe routes and accessible shelters.")
-        if st.button("Start Evacuation Planning", use_container_width=True, type="primary"):
-            st.session_state.page = "Evacuation Planner"
-            st.rerun()
-    with c2:
-        st.markdown("**Get Personalized Help**\n\nAsk the AI assistant about your situation.")
-        if st.button("Open AI Assistant", use_container_width=True):
-            st.session_state.page = "AI Assistant"
-            st.rerun()
-    with c3:
-        st.markdown("**Safe Routes**\n\nFire-aware routing avoiding active zones.")
-        if st.button("View Safe Routes", use_container_width=True):
-            st.session_state.page = "Safe Routes & Transit"
-            st.rerun()
-
-    st.divider()
-
-    if insights:
-        st.markdown("#### Why Act Early?  *(WiDS 2021–2025 real fire data)*")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Median Time to Evac Order",
-                  f"{insights['median_delay_h']:.1f}h" if insights['median_delay_h'] else "N/A",
-                  help="Half of evacuations are ordered within this time of fire start")
-        m2.metric("Worst-Case Delay",
-                  f"{insights['p90_delay_h']:.0f}h" if insights['p90_delay_h'] else "N/A",
-                  help="10% of fires take this long or longer to get an order")
-        m3.metric("Fires Requiring Evacuation",
-                  f"{insights['evac_pct']:.1f}%",
-                  help="Percentage of fires that resulted in evacuation actions")
-        m4.metric("High-Risk County Fire Events",
-                  f"{insights['vulnerable_fires']:,}",
-                  help="Fire events in counties with SVI score ≥ 0.75")
-        st.caption("Source: WiDS Datathon 2025 — WatchDuty / Genasys Protect, 62,696 fire events 2021–2025")
-    else:
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("High-Risk Counties", "2,847")
-        m2.metric("Transit Modes", "6")
-        m3.metric("Avg Delay Reduction", "23 min")
-        m4.metric("Languages Supported", "5+")
-
-    st.divider()
-    st.subheader("Nearby Active Fires")
-    if len(fire_data) > 0:
-        nearby = fire_data.head(10)
-        for _, fire in nearby.iterrows():
-            name  = fire.get('fire_name', 'Unknown Fire')
-            acres = fire.get('acres', 0)
-            st.warning(f"🔥 **{name}** — {acres:,.0f} acres")
-    else:
-        st.info("No active fire data loaded. Check your connection.")
-
-
-# ── Equity Analysis (Analyst) ─────────────────────────────────────────
-def render_equity_analysis(wids_data):
-    insights = load_real_insights()
-    st.header("Evacuation Equity Analysis")
-
-    if insights:
-        st.success(
-            f"Showing **real data** from {insights['n_delay_obs']:,} fire events "
-            f"with confirmed evacuation actions (WiDS 2021–2025 dataset)"
-        )
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Median Delay to Order",
-                  f"{insights['median_delay_h']:.1f}h" if insights['median_delay_h'] else "N/A")
-        c2.metric("90th Percentile",
-                  f"{insights['p90_delay_h']:.0f}h" if insights['p90_delay_h'] else "N/A",
-                  delta="critical tail", delta_color="inverse")
-        c3.metric("Fires Exceeding 6h",
-                  f"{insights['pct_over_6h']:.0f}%" if insights['pct_over_6h'] else "N/A",
-                  delta_color="inverse")
-        c4.metric("Vulnerable Fire Growth Rate",
-                  f"{insights['vuln_growth_rate']:.1f} ac/hr" if insights.get('vuln_growth_rate') else "N/A",
-                  delta=f"{insights['pct_growth_difference']:+.0f}% faster"
-                  if insights.get('pct_growth_difference') else None,
-                  delta_color="inverse")
-
-        st.divider()
-
-        evac_df = insights['evac_df']
-        if len(evac_df) > 0 and 'evacuation_delay_hours' in evac_df.columns:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("Evacuation Delay Distribution")
-                fig = px.histogram(
-                    evac_df, x='evacuation_delay_hours', nbins=40,
-                    title=f"Time to Evacuation Order — {len(evac_df):,} Real Fires",
-                    labels={'evacuation_delay_hours':'Hours from Fire Start to Order'},
-                    color_discrete_sequence=['#FF4B4B']
-                )
-                fig.add_vline(x=6, line_dash="dash", line_color="orange",
-                              annotation_text="6h Critical Threshold")
-                if insights['median_delay_h']:
-                    fig.add_vline(x=insights['median_delay_h'], line_dash="dot", line_color="white",
-                                  annotation_text=f"Median {insights['median_delay_h']:.1f}h")
-                fig.update_layout(height=380, plot_bgcolor='rgba(0,0,0,0)',
-                                  paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                st.plotly_chart(fig, use_container_width=True)
-
-            with col2:
-                st.subheader("Vulnerable vs Non-Vulnerable")
-                vuln_data   = evac_df[evac_df['is_vulnerable']==1]['evacuation_delay_hours'].dropna()
-                normal_data = evac_df[evac_df['is_vulnerable']==0]['evacuation_delay_hours'].dropna()
-                if len(vuln_data) > 0 and len(normal_data) > 0:
-                    fig2 = go.Figure()
-                    fig2.add_trace(go.Histogram(x=vuln_data, name='Vulnerable (SVI ≥ 0.75)',
-                                                marker_color='#FF4B4B', opacity=0.7, nbinsx=30))
-                    fig2.add_trace(go.Histogram(x=normal_data, name='Non-Vulnerable',
-                                                marker_color='#4B9FFF', opacity=0.7, nbinsx=30))
-                    fig2.update_layout(barmode='overlay', height=380,
-                                       xaxis_title='Hours to Evacuation Order',
-                                       plot_bgcolor='rgba(0,0,0,0)',
-                                       paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                    st.plotly_chart(fig2, use_container_width=True)
-                    pct = insights.get('pct_delay_difference', 0)
-                    if pct and pct > 0:
-                        st.warning(f"Vulnerable counties wait **{pct:.0f}% longer** for evacuation orders")
-                    elif pct and pct < 0:
-                        st.info(
-                            f"Vulnerable counties receive orders **{abs(pct):.0f}% faster** on median — "
-                            f"but face **{insights.get('pct_growth_difference',0):+.0f}% faster fire growth**, "
-                            f"leaving less actual response time."
+        if show_hist:
+            for i, session in enumerate(reversed(displayable[-5:])):
+                sid   = session.get("session_id", f"session_{i}")
+                sdate = sid[:8]
+                stime = sid[9:13] if len(sid) > 9 else ""
+                try:
+                    label_dt = datetime.strptime(f"{sdate} {stime}", "%Y%m%d %H%M")
+                    label    = label_dt.strftime("%b %-d, %-I:%M %p")
+                except Exception:
+                    label = sid
+                n = len(session.get("messages", []))
+                with st.expander(f"🗓 {label} — {n} messages"):
+                    for m in session.get("messages", []):
+                        ts_h = m.get("ts", "")
+                        role_label = "You" if m["role"] == "user" else persona_name
+                        bubble_style = (
+                            "background:rgba(170,0,0,0.08);border-radius:8px;"
+                            "padding:6px 10px;margin:3px 0;font-size:0.78rem;"
+                        ) if m["role"] == "user" else (
+                            "background:rgba(128,128,128,0.07);border-radius:8px;"
+                            "padding:6px 10px;margin:3px 0;font-size:0.78rem;"
+                        )
+                        st.markdown(
+                            f"<div style='{bubble_style}'>"
+                            f"<span style='font-size:0.62rem;opacity:0.5'>"
+                            f"{role_label} {ts_h}</span><br>"
+                            f"{m['content']}</div>",
+                            unsafe_allow_html=True,
                         )
 
-        st.divider()
 
-        if insights.get('vuln_growth_rate') and insights.get('nonvuln_growth_rate'):
-            st.subheader("Fire Growth Rate by County Vulnerability")
-            col1, col2 = st.columns(2)
-            with col1:
-                fig3 = go.Figure(go.Bar(
-                    x=['Vulnerable\n(SVI ≥ 0.75)', 'Non-Vulnerable'],
-                    y=[insights['vuln_growth_rate'], insights['nonvuln_growth_rate']],
-                    marker_color=['#FF4B4B','#4B9FFF'],
-                    text=[f"{insights['vuln_growth_rate']:.2f} ac/hr",
-                          f"{insights['nonvuln_growth_rate']:.2f} ac/hr"],
-                    textposition='outside'
-                ))
-                fig3.update_layout(
-                    title=f"Median Growth Rate ({insights['n_growth_obs']:,} fires)",
-                    yaxis_title="Acres per Hour", height=350,
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)', font_color='white'
-                )
-                st.plotly_chart(fig3, use_container_width=True)
-            with col2:
-                st.markdown("#### Key Finding")
-                st.markdown(
-                    f"Fires in vulnerable counties grow at **{insights['vuln_growth_rate']:.1f} ac/hr**, "
-                    f"vs **{insights['nonvuln_growth_rate']:.1f} ac/hr** in non-vulnerable counties "
-                    f"— a **{insights['pct_growth_difference']:+.0f}% difference**.\n\n"
-                    f"Even when evacuation orders arrive at similar times, vulnerable populations "
-                    f"face fires that spread faster, leaving **less real time to respond**.\n\n"
-                    f"This is the core justification for the **proactive caregiver alert system**: "
-                    f"alert caregivers when the fire starts — don't wait for the order."
-                )
-                st.metric("Vulnerable Growth Rate",    f"{insights['vuln_growth_rate']:.2f} ac/hr")
-                st.metric("Non-Vulnerable Growth Rate", f"{insights['nonvuln_growth_rate']:.2f} ac/hr")
-                st.metric("Difference", f"{insights['pct_growth_difference']:+.0f}%", delta_color="inverse")
-
-        st.divider()
-        st.caption(
-            f"Data: WiDS Datathon 2025 — WatchDuty / Genasys Protect  ·  "
-            f"{insights['total_fires']:,} fire events 2021–2025  ·  "
-            f"{insights['fires_with_evac']:,} with confirmed evacuation actions  ·  "
-            f"SVI: CDC Social Vulnerability Index 2022"
-        )
-
-    else:
-        st.info("Real data file not found — showing modeled distributions")
-        np.random.seed(42)
-        vd  = np.random.gamma(3, 2, 1000)
-        nvd = np.random.gamma(2, 1.5, 1000)
-        col1, col2 = st.columns(2)
-        with col1:
-            fig = go.Figure()
-            fig.add_trace(go.Histogram(x=vd,  name='Vulnerable',    marker_color='#FF4B4B', opacity=0.7))
-            fig.add_trace(go.Histogram(x=nvd, name='Non-Vulnerable', marker_color='#4B4BFF', opacity=0.7))
-            fig.update_layout(barmode='overlay', xaxis_title='Hours', height=400)
-            st.plotly_chart(fig, use_container_width=True)
-        with col2:
-            diff = vd.mean() - nvd.mean()
-            st.metric("Vulnerable Avg",     f"{vd.mean():.2f}h")
-            st.metric("Non-Vulnerable Avg", f"{nvd.mean():.2f}h")
-            st.metric("Disparity", f"{diff:.2f}h",
-                      delta=f"{diff/nvd.mean()*100:.1f}%", delta_color="inverse")
+# ─────────────────────────────────────────────────────────────────────────────
+# PAGE ROUTER
+# ─────────────────────────────────────────────────────────────────────────────
+page = st.session_state.current_page
 
 
-# ── Analyst Dashboard ─────────────────────────────────────────────────
-def render_analyst_dashboard(fire_data, vulnerable_populations, wids_data):
-    insights = load_real_insights()
-    st.markdown('<h1 class="main-header">49ers Intelligence Lab — WiDS 2025</h1>',
-                unsafe_allow_html=True)
+def _render_page():
+    if page == "Command Dashboard":
+        from command_dashboard_page import render_command_dashboard
+        render_command_dashboard(fire_data, fire_source, fire_label)
 
-    # Top metrics — real data if available, fallback otherwise
-    c1, c2, c3, c4 = st.columns(4)
-    if insights:
-        c1.metric("Fire Events Analyzed",  f"{insights['total_fires']:,}")
-        c2.metric("With Evac Actions",     f"{insights['fires_with_evac']:,}")
-        c3.metric("Vulnerable Counties",   f"{insights['vulnerable_fires']:,}")
-        c4.metric("Median Delay",
-                  f"{insights['median_delay_h']:.1f}h" if insights['median_delay_h'] else "N/A")
-    else:
-        c1.metric("Caregivers Registered", "2,847")
-        c2.metric("Avg Alert Delivery",    "12 min")
-        c3.metric("Evacuation Success",    "94.2%")
-        c4.metric("Lives Protected",       "1,600+")
+    elif page == "Start Here":
+        from caregiver_start_page import render_caregiver_start_page
+        render_caregiver_start_page()
 
-    st.divider()
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("Vulnerable Population Locations")
-        m = folium.Map(location=[39.83, -98.58], zoom_start=4)
-        for loc, data in list(vulnerable_populations.items())[:100]:
-            folium.CircleMarker(
-                location=[data['lat'], data['lon']],
-                radius=max(5, min(data['svi_score']*15, 20)),
-                color='#4B9FFF', fill=True, fillColor='#4B9FFF', fillOpacity=0.6,
-                popup=f"<b>{loc}</b><br>SVI: {data['svi_score']:.3f}<br>"
-                      f"Vulnerable: {data['vulnerable_count']:,}"
-            ).add_to(m)
-        st_folium(m, width=None, height=420)
-
-    with col2:
-        st.subheader("Real Data Summary")
-        if insights:
-            st.metric("Fires w/ Evac Orders",   f"{insights['fires_with_evac']:,}")
-            st.metric("Median Delay",
-                      f"{insights['median_delay_h']:.1f}h" if insights['median_delay_h'] else "N/A")
-            st.metric("90th Percentile Delay",
-                      f"{insights['p90_delay_h']:.0f}h" if insights['p90_delay_h'] else "N/A")
-            if insights.get('vuln_growth_rate'):
-                st.metric("Vuln County Growth Rate", f"{insights['vuln_growth_rate']:.1f} ac/hr",
-                          delta=f"{insights['pct_growth_difference']:+.0f}% vs non-vuln",
-                          delta_color="inverse")
-        else:
-            st.info("Run build_real_delays.py to load real data.")
-
-        st.divider()
-        st.subheader("High-SVI Counties")
-        vp_df = pd.DataFrame.from_dict(vulnerable_populations, orient='index').reset_index()
-        vp_df.columns = ['Location','Lat','Lon','Vulnerable Count','SVI Score']
-        vp_df = vp_df.sort_values('SVI Score', ascending=False).head(10)
-        vp_df['SVI Score'] = vp_df['SVI Score'].round(3)
-        st.dataframe(vp_df[['Location','SVI Score']], hide_index=True, use_container_width=True)
-
-
-# ── Risk Calculator ───────────────────────────────────────────────────
-def render_risk_calculator(vulnerable_populations):
-    st.header("Wildfire Risk Calculator")
-    st.markdown("Estimate evacuation risk for a specific location based on SVI and fire proximity.")
-    st.divider()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        county = st.selectbox("Select County", sorted(vulnerable_populations.keys()))
-        distance_km = st.slider("Distance to Nearest Active Fire (km)", 0, 200, 50)
-        wind_speed  = st.slider("Wind Speed (mph)", 0, 80, 15)
-        time_of_day = st.selectbox("Time of Day", ["Morning","Afternoon","Evening","Night"])
-    with col2:
-        if county in vulnerable_populations:
-            data = vulnerable_populations[county]
-            svi  = data['svi_score']
-            base_risk = svi * 0.4 + max(0, (100-distance_km)/100) * 0.4 + (wind_speed/80) * 0.2
-            risk_score = min(base_risk * 100, 100)
-            color = "#FF4B4B" if risk_score > 70 else "#FFA500" if risk_score > 40 else "#00CC00"
-            label = "HIGH RISK" if risk_score > 70 else "MEDIUM RISK" if risk_score > 40 else "LOW RISK"
-            st.markdown(f'<div class="risk-{"high" if risk_score>70 else "medium" if risk_score>40 else "low"}">'
-                        f'Risk Score: {risk_score:.0f}/100 — {label}</div>', unsafe_allow_html=True)
-            st.divider()
-            st.metric("SVI Score",           f"{svi:.3f}")
-            st.metric("Vulnerable Population", f"{data['vulnerable_count']:,}")
-            st.metric("Distance to Fire",    f"{distance_km} km")
-            if risk_score > 70:
-                st.error("⚠️ Recommend immediate caregiver notification and evacuation preparation.")
-            elif risk_score > 40:
-                st.warning("🔶 Monitor situation. Alert caregivers to stand by.")
+    elif page == "Evacuation Planner":
+        try:
+            from evacuation_planner_page import render_evacuation_planner_page
+            sig    = inspect.signature(render_evacuation_planner_page)
+            params = list(sig.parameters.keys())
+            saved_plan = get_evacuation_plan(username)
+            if saved_plan and "evacuation_plan_loaded" not in st.session_state:
+                st.session_state.evacuation_plan_loaded = True
+                st.info("Your saved evacuation plan has been restored.")
+            if "vulnerable_populations" in params and "fire_data" in params:
+                render_evacuation_planner_page(fire_data=fire_data, vulnerable_populations=None)
+            elif "fire_data" in params:
+                render_evacuation_planner_page(fire_data=fire_data)
             else:
-                st.success("✅ Low risk currently. Continue monitoring.")
+                render_evacuation_planner_page()
+        except Exception as e:
+            st.error(f"Evacuation Planner error: {e}")
+
+    elif page == "Safe Routes & Transit":
+        try:
+            from directions_page import render_directions_page
+            render_directions_page()
+        except SyntaxError as e:
+            st.error(f"directions_page.py syntax error (line {e.lineno}): {e.msg}")
+        except ImportError as e:
+            st.error(f"Safe Routes module not found: {e}")
+
+    elif page == "Equity Analysis":
+        try:
+            from equity_analysis_page import render_equity_analysis_page
+            render_equity_analysis_page()
+        except ImportError:
+            from real_data_insights import render_real_data_insights
+            render_real_data_insights()
+
+    elif page == "Risk Calculator":
+        from risk_calculator_page import render_risk_calculator_page
+        render_risk_calculator_page()
+
+    elif page == "Impact Projection":
+        from impact_projection_page import render_impact_projection_page
+        render_impact_projection_page()
+
+    elif page == "Coverage Analysis":
+        from coverage_analysis_page import render_coverage_analysis_page
+        render_coverage_analysis_page()
+
+    elif page == "Zone Duration":
+        from zone_duration_page import render_zone_duration_page
+        render_zone_duration_page()
+
+    elif page == "Fire Predictor":
+        from fire_prediction_page import render_fire_prediction_page
+        render_fire_prediction_page(role=username)
+
+    elif page == "About":
+        _render_about()
+
+    elif page == "Data Governance":
+        from data_governance import render_data_governance
+        render_data_governance()
 
 
-# ── Impact Projection ─────────────────────────────────────────────────
-def render_impact_projection():
-    insights = load_real_insights()
-    st.header("Caregiver Alert System — Impact Projection")
-    st.divider()
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYOUT
+# ─────────────────────────────────────────────────────────────────────────────
+if st.session_state.show_ai_panel and st.session_state.ai_fullscreen:
+    # Full screen AI — chips visible, no border needed
+    _render_ai_panel(role, is_fullscreen=True, show_border=False)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Parameters")
-        alert_reduction = st.slider("Alert Lead Time Reduction (hours)", 0.5, 4.0, 2.0, 0.5)
-        coverage_pct    = st.slider("Caregiver Registration Coverage (%)", 10, 100, 40)
-        vulnerable_pop  = st.number_input("Vulnerable Population in Target Area", 1000, 500000, 50000)
+elif st.session_state.show_ai_panel:
+    # Side-by-side — AI column gets the left-border sentinel, no chips
+    main_col, ai_col = st.columns([3, 2], gap="small")
+    with main_col:
+        _render_page()
+    with ai_col:
+        _render_ai_panel(role, is_fullscreen=False, show_border=True)
 
-    with col2:
-        st.subheader("Projected Impact")
-        base_delay   = insights['median_delay_h'] if insights and insights['median_delay_h'] else 6.0
-        new_delay    = max(base_delay - alert_reduction, 0.5)
-        covered      = int(vulnerable_pop * coverage_pct / 100)
-        pct_improv   = (base_delay - new_delay) / base_delay * 100
-        lives_impact = int(covered * 0.003 * (pct_improv / 100))
-
-        st.metric("Baseline Median Delay",     f"{base_delay:.1f}h",
-                  help="From real WiDS data" if insights else "Estimated")
-        st.metric("Projected Delay with System", f"{new_delay:.1f}h",
-                  delta=f"-{alert_reduction:.1f}h", delta_color="normal")
-        st.metric("Population Covered",        f"{covered:,}")
-        st.metric("Estimated Lives Impacted",  f"{lives_impact:,}")
-
-        if insights:
-            st.caption(f"Baseline from {insights['fires_with_evac']:,} real fire events (WiDS dataset)")
-
-    st.divider()
-    st.subheader("Delay Distribution: Before vs After System")
-    np.random.seed(42)
-    before = np.random.gamma(3, base_delay/2, 500)
-    after  = np.random.gamma(3, new_delay/2,  500)
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(x=before, name='Without System', marker_color='#FF4B4B', opacity=0.7))
-    fig.add_trace(go.Histogram(x=after,  name='With Caregiver Alert', marker_color='#4BFF9F', opacity=0.7))
-    fig.update_layout(barmode='overlay', xaxis_title='Hours to Evacuation',
-                      plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                      font_color='white', height=350)
-    st.plotly_chart(fig, use_container_width=True)
-
-
-# ── About ─────────────────────────────────────────────────────────────
-def render_about():
-    render_logo(width=160, shape="rounded")
-    st.markdown("""
-## 49ers Intelligence Lab
-### WiDS Datathon 2025 — Wildfire Evacuation Alert System for Vulnerable Populations
-
-**Currently in 2nd place** in the WiDS Datathon 2025.
-
-### The Problem
-Vulnerable populations — elderly, disabled, low-income, non-English-speaking — face
-**significantly greater wildfire risk** due to mobility limitations, technology gaps,
-and reduced access to transportation.
-
-### Our Solution
-A proactive caregiver alert system that notifies family members and caregivers the moment
-a wildfire threatens their vulnerable loved ones — before official evacuation orders are issued.
-
-### Real Data Findings *(WiDS 2021–2025 dataset)*
-- Median time from fire start to evacuation order: **1.1 hours**
-- 10% of fires take **32+ hours** to receive an order
-- Fires in vulnerable counties grow **17% faster** (11.7 vs 10.0 acres/hour)
-
-### Technology Stack
-- **Data:** CDC Social Vulnerability Index 2022, WatchDuty / Genasys Protect, USFA Registry
-- **Analysis:** Python, Cox Proportional Hazards, Getis-Ord Gi* hotspot detection
-- **Dashboard:** Streamlit, Folium, Plotly
-- **Routing:** OSRM (open-source), OpenStreetMap
-
-### Team
-UNC Charlotte — combining data science, international security, and public health.
-
-**Conference:** WiDS  ·  April 21–22, 2026
-**GitHub:** https://github.com/layesh1/widsdatathon
-""")
-
-
-# ── Sidebar ───────────────────────────────────────────────────────────
-def render_sidebar():
-    with st.sidebar:
-        render_logo(width=80)
-        role    = st.session_state.role
-        color   = ROLE_COLORS[role]
-        display = st.session_state.role_display
-        st.markdown(f"<div style='text-align:center;color:{color};font-weight:bold;"
-                    f"margin-bottom:0.5rem;'>{display}</div>", unsafe_allow_html=True)
-        st.caption(f"Logged in as: {st.session_state.username}")
-        st.divider()
-
-        pages = ROLE_PAGES[role]
-        for pg in pages:
-            active = st.session_state.get('page') == pg
-            style  = f"background:{color}22;border-left:3px solid {color};" if active else ""
-            if st.button(pg, key=f"nav_{pg}", use_container_width=True):
-                st.session_state.page = pg
-                st.rerun()
-
-        st.divider()
-        if st.button("Sign Out", use_container_width=True):
-            for k in ['logged_in','username','role','role_display','chat_messages','page']:
-                st.session_state.pop(k, None)
-            st.rerun()
-
-
-# ── Main ──────────────────────────────────────────────────────────────
-def main():
-    if not st.session_state.get('logged_in'):
-        render_login()
-        return
-
-    render_sidebar()
-
-    role = st.session_state.role
-    page = st.session_state.get('page', ROLE_PAGES[role][0])
-
-    # Load data once
-    with st.spinner("Loading data..."):
-        fire_data            = load_fire_data()
-        vulnerable_populations = load_vulnerable_populations()
-        usfa_data            = load_usfa_data()
-        wids_data            = load_wids_analysis_data()
-
-    # ── Emergency Worker ──────────────────────────────────────────────
-    if role == "emergency_worker":
-        if page == "Command Dashboard":
-            render_command_dashboard(fire_data, vulnerable_populations, usfa_data)
-        elif page == "AI Assistant":
-            render_chatbot(role)
-
-    # ── Caregiver / Evacuee ───────────────────────────────────────────
-    elif role == "evacuee":
-        if page == "Start Here":
-            render_start_here(fire_data, vulnerable_populations)
-        elif page == "Evacuation Planner":
-            if PLANNER_AVAILABLE:
-                render_evacuation_planner_page(fire_data, vulnerable_populations)
-            else:
-                st.warning("Evacuation Planner module not available.")
-        elif page == "Safe Routes & Transit":
-            if DIRECTIONS_AVAILABLE:
-                render_directions_page(fire_data, vulnerable_populations)
-            else:
-                st.warning("Safe Routes module not available.")
-        elif page == "AI Assistant":
-            render_chatbot(role)
-
-    # ── Data Analyst ──────────────────────────────────────────────────
-    elif role == "analyst":
-        if page == "Dashboard":
-            render_analyst_dashboard(fire_data, vulnerable_populations, wids_data)
-        elif page == "Equity Analysis":
-            render_equity_analysis(wids_data)
-        elif page == "Risk Calculator":
-            render_risk_calculator(vulnerable_populations)
-        elif page == "Impact Projection":
-            render_impact_projection()
-        elif page == "AI Assistant":
-            render_chatbot(role)
-        elif page == "About":
-            render_about()
-
-if __name__ == "__main__":
-    main()
+else:
+    # AI closed — full-width
+    _render_page()
