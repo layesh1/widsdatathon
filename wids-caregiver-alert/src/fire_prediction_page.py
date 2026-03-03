@@ -191,7 +191,7 @@ def render_fire_prediction_page(role="analyst"):
                 (pd.to_numeric(firms_df["longitude"], errors="coerce").between(-125, -65))
             ].copy()
             firms_us["lat_f"] = pd.to_numeric(firms_us["latitude"])
-            firms_us["lon_f"] = pd.to_numeric(firms_df["longitude"] if "longitude" in firms_df.columns else firms_us["longitude"])
+            firms_us["lon_f"] = pd.to_numeric(firms_us["longitude"], errors="coerce")
 
             for i, row in hotspot_df.iterrows():
                 # Count FIRMS hotspots within ~1.5 degrees
