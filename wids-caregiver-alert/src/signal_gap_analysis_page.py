@@ -34,7 +34,9 @@ def load_gap_data():
 
         # KPIs
         kpi_res = sb.table("v_dashboard_kpis").select("*").execute()
-        kpi = kpi_res.data[0] if kpi_res.data else FALLBACK_STATS
+        raw = kpi_res.data[0] if kpi_res.data else {}
+        # Use fallback if Supabase view returns zeros/nulls
+        kpi = FALLBACK_STATS if not raw or raw.get("incidents_with_signal", 0) == 0 else raw
 
         # Dangerous delay candidates (signal, no action)
         danger_res = (
