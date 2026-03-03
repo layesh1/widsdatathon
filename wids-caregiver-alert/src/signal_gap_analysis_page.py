@@ -251,14 +251,15 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
 
         plot_delay = delay_df.copy()
         plot_delay = plot_delay.dropna(subset=["source_attribution", "median_delay_min"])
-        plot_delay["median_delay_h"] = plot_delay["median_delay_min"] / 60
+        plot_delay["median_delay_h"] = pd.to_numeric(plot_delay["median_delay_min"], errors="coerce") / 60
         plot_delay = (
             plot_delay.groupby("source_attribution")["median_delay_h"]
-            .median()
+            .mean()
             .reset_index()
             .sort_values("median_delay_h", ascending=True)
             .head(15)
         )
+        plot_delay = plot_delay[plot_delay["median_delay_h"] > 0]
 
         fig_agency = go.Figure(go.Bar(
             x=plot_delay["median_delay_h"],
