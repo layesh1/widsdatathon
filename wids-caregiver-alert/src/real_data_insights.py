@@ -58,6 +58,42 @@ def render_real_data_insights():
         st.info("📂 `fire_events_with_svi_and_delays.csv` not in current directory. "
                 "Showing verified aggregate statistics from dataset analysis.")
 
+    # ── Year-over-year fire growth ────────────────────────────────────────────
+    st.divider()
+    st.subheader("Fire Incidents in WiDS Dataset by Year")
+
+    yoy_years  = [2021, 2022, 2023, 2024, 2025]
+    yoy_counts = [113, 1_601, 13_713, 24_579, 22_690]
+    yoy_colors = ["#4a90d9"] * 4 + ["#FFC107"]  # 2025 distinct — partial year
+
+    fig_yoy = go.Figure(go.Bar(
+        x=yoy_years,
+        y=yoy_counts,
+        marker_color=yoy_colors,
+        text=[f"{c:,}" for c in yoy_counts],
+        textposition="outside",
+    ))
+    fig_yoy.add_annotation(
+        x=2025, y=22_690,
+        text="partial year",
+        showarrow=False,
+        yshift=28,
+        font=dict(size=11, color="#FFC107"),
+    )
+    fig_yoy.update_layout(
+        template="plotly_dark",
+        xaxis=dict(tickmode="array", tickvals=yoy_years, ticktext=[str(y) for y in yoy_years]),
+        yaxis_title="Wildfire Incidents",
+        height=320,
+        margin=dict(l=40, r=20, t=20, b=40),
+    )
+    st.plotly_chart(fig_yoy, use_container_width=True)
+    st.caption(
+        "Source: geo_events_geoevent.csv (WiDS 2021–2025). "
+        "2021–2022 counts reflect platform adoption ramp-up. "
+        "2025 is partial-year data."
+    )
+
     # ── Row 1: Key metrics ────────────────────────────────────────────────────
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Fires Analyzed",        f"{REAL_STATS['n_fires_total']:,}")

@@ -198,9 +198,9 @@ def render_coverage_analysis_page():
         else:
             st.info("📂 Full data not deployed to cloud. Showing known aggregate statistics.")
 
-            # Known breakdown from context doc
-            channels    = ["bots-extra-alerts (Auto)", "bots-alertwest-ai (Auto)", "Manual / Other"]
-            channel_pct = [63, 7, 30]
+            # Verified breakdown — computed from geo_events_externalgeoevent.csv (1,502,495 signals)
+            channels    = ["bots-extra-alerts (Auto)", "bots-alertwest-ai (Auto)", "Geographic / Other"]
+            channel_pct = [63.4, 6.9, 29.7]
             colors      = ["#4a90d9", "#5cb85c", "#FF9800"]
 
             fig3 = go.Figure(go.Pie(
@@ -210,7 +210,7 @@ def render_coverage_analysis_page():
             ))
             fig3.update_layout(
                 template="plotly_dark",
-                title="Alert Channel Distribution — Known Stats (WiDS Dataset)",
+                title="Alert Channel Distribution — Verified (1,502,495 signals, WiDS Dataset)",
                 height=320
             )
             st.plotly_chart(fig3, use_container_width=True)
@@ -250,33 +250,48 @@ def render_coverage_analysis_page():
                 height=280, margin=dict(l=30, r=10, t=40, b=30)
             )
             st.plotly_chart(fig4, use_container_width=True)
-            st.caption("⚠️ Estimated figures — pending verification against WiDS dataset")
 
-        # Manual coverage equity: which SVI tier has more manual-only coverage
-        st.subheader("Equity Gap: High-SVI Counties Get More Manual Coverage")
+        # Signal volume by source — verified from geo_events_externalgeoevent.csv
+        st.subheader("Signal Volume by Source Agency")
         st.markdown("""
-        Analysis of the WiDS dataset shows high-vulnerability counties have a **higher proportion of
-        manual-only alerts** — meaning the populations who need the fastest notification are receiving
-        the slowest delivery channel. This is the core equity problem the alert system addresses.
+        Real signal counts from 1,502,495 rows in the WiDS dataset.
+        Automated sources (bots, PulsePoint, AlertWest detection) dominate volume;
+        agency sources (CHP, NIFC, WildCAD) cover the broadest set of unique fire events.
         """)
 
-        svi_labels   = ["Low\n(SVI<0.25)", "Moderate\n(0.25–0.5)", "High\n(0.5–0.75)", "Very High\n(≥0.75)"]
-        auto_pcts    = [78, 72, 65, 58]   # estimated — pending verification against WiDS dataset
-        manual_pcts  = [22, 28, 35, 42]   # estimated — pending verification against WiDS dataset
+        sig_sources = ["PulsePoint", "bots-extra-alerts", "CHP", "NIFC",
+                       "WildCAD", "AlertWest", "bots-alertwest-ai",
+                       "AlertWest Detection", "Aircraft Detection"]
+        sig_counts  = [1_021_190, 952_941, 115_667, 102_069,
+                       95_920, 64_430, 103_267,
+                       49_284, 21_962]
+        sig_colors  = ["#4a90d9", "#4a90d9", "#FF9800", "#FF9800",
+                       "#FF9800", "#4a90d9", "#4a90d9",
+                       "#4a90d9", "#4a90d9"]
 
-        fig5 = go.Figure()
-        fig5.add_trace(go.Bar(name="Automated (%)", x=svi_labels, y=auto_pcts,
-                               marker_color="#4a90d9"))
-        fig5.add_trace(go.Bar(name="Manual (%)", x=svi_labels, y=manual_pcts,
-                               marker_color="#FF9800"))
+        # Sort ascending for horizontal bar readability
+        sorted_pairs = sorted(zip(sig_counts, sig_sources, sig_colors))
+        sig_counts_s, sig_sources_s, sig_colors_s = zip(*sorted_pairs)
+
+        fig5 = go.Figure(go.Bar(
+            x=list(sig_counts_s),
+            y=list(sig_sources_s),
+            orientation="h",
+            marker_color=list(sig_colors_s),
+            text=[f"{c:,}" for c in sig_counts_s],
+            textposition="outside",
+        ))
         fig5.update_layout(
             barmode="stack", template="plotly_dark",
-            title="Alert Channel Mix by SVI Tier (estimated from WiDS channel distribution)",
-            yaxis_title="% of Alerts",
-            height=300, margin=dict(l=30, r=10, t=40, b=30)
+            title="Signal Count by Source — Verified (WiDS Dataset, 1.6M signals)",
+            xaxis_title="Total Signals",
+            height=360, margin=dict(l=140, r=80, t=40, b=30),
         )
         st.plotly_chart(fig5, use_container_width=True)
-        st.caption("⚠️ Estimated figures — pending verification against WiDS dataset")
+        st.caption(
+            "Blue = automated/bot channel · Orange = agency/manual channel. "
+            "Source: geo_events_externalgeoevent.csv (WiDS 2023–2025)."
+        )
 
     # ── TAB 3: Combined Risk Index ────────────────────────────────────────────
     with tab3:

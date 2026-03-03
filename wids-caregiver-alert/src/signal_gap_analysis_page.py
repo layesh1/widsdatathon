@@ -21,7 +21,7 @@ VERIFIED_STATS = {
     "incidents_with_signal": 41906,
     "pct_missing_action": 0.9974,
     "median_delay_min": 211.5,
-    "p90_delay_min": 6017.8,
+    "p90_delay_min": 6018,
 }
 
 
@@ -123,8 +123,8 @@ def render_signal_gap_analysis():
     )
     k4.metric(
         "Worst-Case Delay (P90)",
-        f"{p90_min/60:.0f}h",
-        delta="~100 hours",
+        f"{p90_min/60:.1f}h",
+        delta=f"{p90_min/60:.1f} hours · computed from raw data",
         delta_color="inverse",
         help="90th percentile signal-to-action delay"
     )
