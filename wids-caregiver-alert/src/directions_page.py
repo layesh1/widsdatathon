@@ -1298,7 +1298,7 @@ def render_directions_page(fire_data, vulnerable_populations):
 
             st.markdown(
                 f'<div style="border:{border_width} solid {border_color}; border-radius:12px; '
-                f'padding:14px 16px; margin-bottom:10px; background:#{'f0f7ff' if is_selected else 'ffffff'};">',
+                f'padding:14px 16px; margin-bottom:10px; background:{"#f0f7ff" if is_selected else "#ffffff"};">',
                 unsafe_allow_html=True,
             )
 
