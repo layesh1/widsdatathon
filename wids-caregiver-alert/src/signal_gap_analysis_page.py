@@ -25,7 +25,7 @@ FALLBACK_STATS = {
 }
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=1, show_spinner=False)
 def load_gap_data():
     """Load all signal gap data from Supabase views."""
     try:
