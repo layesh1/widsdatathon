@@ -49,6 +49,29 @@ def load_fire_data():
             except Exception:
                 pass
 
+    # 1.5 Try Supabase geo_events_geoevent table
+    try:
+        from auth_supabase import get_supabase
+        sb = get_supabase()
+        res = (
+            sb.table("geo_events_geoevent")
+            .select("id, name, lat, lon, is_active, date_created, notification_type")
+            .eq("is_active", True)
+            .limit(2000)
+            .execute()
+        )
+        if res.data and len(res.data) > 0:
+            df = pd.DataFrame(res.data)
+            df["lat"] = pd.to_numeric(df.get("lat", None), errors="coerce")
+            df["lon"] = pd.to_numeric(df.get("lon", None), errors="coerce")
+            df = df.dropna(subset=["lat", "lon"])
+            df = df[(df["lat"].between(24, 72)) & (df["lon"].between(-180, -65))]
+            if len(df) > 0:
+                df["source"] = "wids"
+                return df, "wids", f"🟢 WiDS Geo Events (Supabase · {len(df):,} active)"
+    except Exception:
+        pass
+
     # 2. NASA FIRMS VIIRS (no key)
     for url, key, label in [
         (FIRMS_VIIRS, "firms_viirs", "🟡 NASA FIRMS VIIRS (Live)"),
