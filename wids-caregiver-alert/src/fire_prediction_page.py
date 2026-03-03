@@ -267,7 +267,7 @@ def render_fire_prediction_page(role="analyst"):
                 showlakes=True, lakecolor="#0d1117",
                 showcountries=True, countrycolor="#333",
                 showstates=True, statecolor="#333",
-                projection_type="albers usa"
+                projection=dict(type="albers usa")
             ),
             height=480,
             margin=dict(l=0, r=0, t=40, b=0),
