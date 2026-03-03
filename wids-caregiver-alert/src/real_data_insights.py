@@ -18,6 +18,7 @@ from pathlib import Path
 
 
 REAL_STATS = {
+    # NOTE: fire_events has 124,696 raw rows in Supabase, needs dedup to 62,696 — do not update this number until resolved
     "n_fires_total":   62696,
     "n_with_evac":     653,
     "n_high_vul":      int(653 * 0.398),

@@ -223,8 +223,8 @@ def render_known_stats():
     """)
 
     svi_tiers = ["Low SVI (<0.25)", "Moderate (0.25–0.5)", "High (0.5–0.75)", "Very High (≥0.75)"]
-    median_orders  = [14.2, 16.8, 19.3, 23.7]  # hours, estimated from WiDS data
-    p90_orders     = [90, 105, 124, 148]
+    median_orders  = [14.2, 16.8, 19.3, 23.7]  # hours, estimated from WiDS data — pending query verification
+    p90_orders     = [90, 105, 124, 148]        # hours, estimated — pending verification against WiDS dataset
 
     fig2 = go.Figure()
     fig2.add_trace(go.Bar(
@@ -243,6 +243,7 @@ def render_known_stats():
         margin=dict(l=30, r=10, t=40, b=30)
     )
     st.plotly_chart(fig2, use_container_width=True)
+    st.caption("⚠️ Estimated figures — pending verification against WiDS dataset")
 
     st.divider()
 

@@ -26,8 +26,8 @@ EVAC_FAILURE_MORTALITY   = 0.0017  # deaths per person who fails to evacuate in 
 HIGH_VUL_EVAC_DELAY_MULT = 1.4    # vulnerable pop evacuate 40% slower (CDC/FEMA data)
 
 # ── Scale estimates ──
-HIGH_VUL_POP_IN_FIRE_ZONES = 2_800_000  # est. high-SVI residents in WUI zones (2020 Census)
-PCT_WITHOUT_CAREGIVER_ALERT = 0.71      # 71% of vulnerable elderly lack proactive notification
+HIGH_VUL_POP_IN_FIRE_ZONES = 2_800_000  # est. high-SVI residents in WUI zones (2020 Census WUI overlap — pending lit. verification)
+PCT_WITHOUT_CAREGIVER_ALERT = 0.71      # est. 71% of vulnerable elderly lack proactive notification — pending literature citation
 AVG_TIME_SAVED_PER_ALERT_H  = 0.85     # hours earlier departure with proactive alert (FEMA 2019)
 
 

@@ -250,6 +250,7 @@ def render_coverage_analysis_page():
                 height=280, margin=dict(l=30, r=10, t=40, b=30)
             )
             st.plotly_chart(fig4, use_container_width=True)
+            st.caption("⚠️ Estimated figures — pending verification against WiDS dataset")
 
         # Manual coverage equity: which SVI tier has more manual-only coverage
         st.subheader("Equity Gap: High-SVI Counties Get More Manual Coverage")
@@ -260,8 +261,8 @@ def render_coverage_analysis_page():
         """)
 
         svi_labels   = ["Low\n(SVI<0.25)", "Moderate\n(0.25–0.5)", "High\n(0.5–0.75)", "Very High\n(≥0.75)"]
-        auto_pcts    = [78, 72, 65, 58]
-        manual_pcts  = [22, 28, 35, 42]
+        auto_pcts    = [78, 72, 65, 58]   # estimated — pending verification against WiDS dataset
+        manual_pcts  = [22, 28, 35, 42]   # estimated — pending verification against WiDS dataset
 
         fig5 = go.Figure()
         fig5.add_trace(go.Bar(name="Automated (%)", x=svi_labels, y=auto_pcts,
@@ -275,6 +276,7 @@ def render_coverage_analysis_page():
             height=300, margin=dict(l=30, r=10, t=40, b=30)
         )
         st.plotly_chart(fig5, use_container_width=True)
+        st.caption("⚠️ Estimated figures — pending verification against WiDS dataset")
 
     # ── TAB 3: Combined Risk Index ────────────────────────────────────────────
     with tab3:
