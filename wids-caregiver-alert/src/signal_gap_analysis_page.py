@@ -247,31 +247,31 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
     if not delay_df.empty:
         st.divider()
         st.subheader("Response Delay by Reporting Agency")
-        st.caption("Median signal-to-action delay in hours, for agencies with 3+ incidents")
+        st.caption("Total fires with early signal detected, by reporting agency — nearly all received no evacuation action")
 
         plot_delay = delay_df.copy()
-        plot_delay = plot_delay.dropna(subset=["source_attribution", "median_delay_min"])
-        plot_delay["median_delay_h"] = pd.to_numeric(plot_delay["median_delay_min"], errors="coerce") / 60
+        plot_delay = plot_delay.dropna(subset=["source_attribution"])
+        plot_delay["incidents_with_signal"] = pd.to_numeric(plot_delay["incidents_with_signal"], errors="coerce")
         plot_delay = (
-            plot_delay.groupby("source_attribution")["median_delay_h"]
-            .mean()
+            plot_delay.groupby("source_attribution")["incidents_with_signal"]
+            .sum()
             .reset_index()
-            .sort_values("median_delay_h", ascending=True)
-            .head(15)
+            .sort_values("incidents_with_signal", ascending=True)
+            .tail(15)
         )
-        plot_delay = plot_delay[plot_delay["median_delay_h"] > 0]
+        plot_delay = plot_delay[plot_delay["incidents_with_signal"] > 0]
 
         fig_agency = go.Figure(go.Bar(
-            x=plot_delay["median_delay_h"],
+            x=plot_delay["incidents_with_signal"],
             y=plot_delay["source_attribution"],
             orientation="h",
             marker_color="#4a90d9",
-            text=plot_delay["median_delay_h"].round(1).astype(str) + "h",
+            text=plot_delay["incidents_with_signal"].astype(int).astype(str),
             textposition="outside",
         ))
         fig_agency.update_layout(
             template="plotly_dark",
-            xaxis_title="Median Delay (hours)",
+            xaxis_title="Fires with Signal (No Evacuation Action)",
             height=400,
             margin=dict(l=120, r=60, t=20, b=40),
         )
