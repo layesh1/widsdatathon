@@ -263,10 +263,10 @@ def render_fire_prediction_page(role="analyst"):
             title="Predicted High-Risk Zones + Live FIRMS Hotspots",
             geo=dict(
                 scope="usa",
-                showland=True, landcolor="#1e1e1e",
-                showlakes=True, lakecolor="#0d1117",
-                showcountries=True, countrycolor="#333",
-                showstates=True, statecolor="#333",
+                showland=True,
+                showlakes=True,
+                showcountries=True,
+                showstates=True,
                 projection=dict(type="albers usa")
             ),
             height=480,
