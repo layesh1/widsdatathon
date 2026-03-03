@@ -84,16 +84,36 @@ def load_geojson_layer(fname):
 
 # ── Evacuee status tracker (session state) ───────────────────────────────────
 
-def init_evacuee_tracker():
-    """Initialize demo evacuee list in session state."""
+def init_evacuee_tracker(dispatcher_username: str = "dispatcher"):
+    """Load evacuee list from Supabase, fall back to session state demo data."""
+    try:
+        from auth_supabase import get_supabase
+        sb = get_supabase()
+        res = sb.table("evacuation_status").select("*").eq("reporter_username", dispatcher_username).order("updated_at", desc=True).execute()
+        if res.data:
+            rows = []
+            for r in res.data:
+                rows.append({
+                    "name":     r.get("person_name", ""),
+                    "address":  r.get("note", ""),
+                    "mobility": r.get("mobility", "Other"),
+                    "phone":    r.get("phone", ""),
+                    "status":   "Evacuated ✅" if r.get("status") == "Evacuated" else "Unconfirmed",
+                    "db_id":    r.get("id"),
+                })
+            st.session_state.evacuee_list = pd.DataFrame(rows)
+            return
+    except Exception:
+        pass
+    # Fallback demo data
     if "evacuee_list" not in st.session_state:
         st.session_state.evacuee_list = pd.DataFrame([
-            {"address": "142 Oak St, Paradise, CA",         "name": "Martha Chen",      "mobility": "Elderly",    "phone": "530-555-0101", "status": "Unconfirmed"},
-            {"address": "77 Pine Ridge Rd, Magalia, CA",    "name": "Robert Okafor",    "mobility": "Disabled",   "phone": "530-555-0144", "status": "Unconfirmed"},
-            {"address": "89 Skyway, Paradise, CA",          "name": "Delores Perez",    "mobility": "Elderly",    "phone": "530-555-0199", "status": "Unconfirmed"},
-            {"address": "312 Pentz Rd, Paradise, CA",       "name": "James Whitmore",   "mobility": "No vehicle", "phone": "530-555-0177", "status": "Unconfirmed"},
-            {"address": "55 Bille Rd, Paradise, CA",        "name": "Yuki Tanaka",      "mobility": "Disabled",   "phone": "530-555-0155", "status": "Evacuated ✅"},
-            {"address": "201 Clark Rd, Chico, CA",          "name": "Gloria Martinez",  "mobility": "Elderly",    "phone": "530-555-0188", "status": "Unconfirmed"},
+            {"address": "142 Oak St, Paradise, CA",         "name": "Martha Chen",      "mobility": "Elderly",    "phone": "530-555-0101", "status": "Unconfirmed", "db_id": None},
+            {"address": "77 Pine Ridge Rd, Magalia, CA",    "name": "Robert Okafor",    "mobility": "Disabled",   "phone": "530-555-0144", "status": "Unconfirmed", "db_id": None},
+            {"address": "89 Skyway, Paradise, CA",          "name": "Delores Perez",    "mobility": "Elderly",    "phone": "530-555-0199", "status": "Unconfirmed", "db_id": None},
+            {"address": "312 Pentz Rd, Paradise, CA",       "name": "James Whitmore",   "mobility": "No vehicle", "phone": "530-555-0177", "status": "Unconfirmed", "db_id": None},
+            {"address": "55 Bille Rd, Paradise, CA",        "name": "Yuki Tanaka",      "mobility": "Disabled",   "phone": "530-555-0155", "status": "Evacuated ✅", "db_id": None},
+            {"address": "201 Clark Rd, Chico, CA",          "name": "Gloria Martinez",  "mobility": "Elderly",    "phone": "530-555-0188", "status": "Unconfirmed", "db_id": None},
         ])
 
 
@@ -103,7 +123,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
     st.title("⚡ Command Dashboard")
     st.caption(f"Emergency Worker View  ·  {fire_label}  ·  WiDS 2021–2025 Historical Benchmarks")
 
-    init_evacuee_tracker()
+    init_evacuee_tracker(st.session_state.get("username", "dispatcher"))
 
     # ── Historical benchmarks (always real) ──────────────────────────────────
     st.subheader("📊 Historical Response Benchmarks  *(WiDS 2021–2025)*")
@@ -288,10 +308,34 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 if row["status"] != "Evacuated ✅":
                     if st.button("✅ Mark Evacuated", key=f"evac_{i}"):
                         st.session_state.evacuee_list.at[i, "status"] = "Evacuated ✅"
+                        try:
+                            from auth_supabase import get_supabase
+                            username = st.session_state.get("username", "dispatcher")
+                            get_supabase().table("evacuation_status").upsert({
+                                "reporter_username": username,
+                                "person_name": row["name"],
+                                "status": "Evacuated",
+                                "note": row.get("address", ""),
+                                "updated_at": __import__("datetime").datetime.utcnow().isoformat(),
+                            }, on_conflict="reporter_username,person_name").execute()
+                        except Exception:
+                            pass
                         st.rerun()
                 else:
                     if st.button("↩️ Undo", key=f"undo_{i}"):
                         st.session_state.evacuee_list.at[i, "status"] = "Unconfirmed"
+                        try:
+                            from auth_supabase import get_supabase
+                            username = st.session_state.get("username", "dispatcher")
+                            get_supabase().table("evacuation_status").upsert({
+                                "reporter_username": username,
+                                "person_name": row["name"],
+                                "status": "Not Evacuated",
+                                "note": row.get("address", ""),
+                                "updated_at": __import__("datetime").datetime.utcnow().isoformat(),
+                            }, on_conflict="reporter_username,person_name").execute()
+                        except Exception:
+                            pass
                         st.rerun()
 
         st.divider()
@@ -306,11 +350,23 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
             if st.button("Add to tracker") and new_name and new_addr:
                 new_row = pd.DataFrame([{
                     "address": new_addr, "name": new_name,
-                    "mobility": new_mob, "phone": new_phone, "status": "Unconfirmed"
+                    "mobility": new_mob, "phone": new_phone, "status": "Unconfirmed", "db_id": None
                 }])
                 st.session_state.evacuee_list = pd.concat(
                     [st.session_state.evacuee_list, new_row], ignore_index=True
                 )
+                try:
+                    from auth_supabase import get_supabase
+                    username = st.session_state.get("username", "dispatcher")
+                    get_supabase().table("evacuation_status").upsert({
+                        "reporter_username": username,
+                        "person_name": new_name,
+                        "status": "Not Evacuated",
+                        "note": new_addr,
+                        "updated_at": __import__("datetime").datetime.utcnow().isoformat(),
+                    }, on_conflict="reporter_username,person_name").execute()
+                except Exception:
+                    pass
                 st.rerun()
 
         st.caption(
