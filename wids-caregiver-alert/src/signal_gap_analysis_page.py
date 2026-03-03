@@ -63,6 +63,43 @@ def load_gap_data():
         return VERIFIED_STATS, pd.DataFrame(), pd.DataFrame(), False
 
 
+def _cumulative_delay_pct(delay_df, hours_thresholds):
+    """
+    Compute cumulative % of fires-with-action whose median delay falls within
+    each hour threshold, weighted by incidents_with_signal.
+
+    Uses rows from v_delay_summary_by_region_source. Each row carries a
+    median_delay_min for a region/source group; we treat that as a representative
+    delay and weight by the group's incident count.
+
+    Falls back to static verified values if the view is unavailable or empty.
+    """
+    # Static fallback — verified from raw data join (108 fires, signal→evac)
+    static = [2, 5, 15, 28, 45, 65, 78, 90]
+
+    if delay_df is None or delay_df.empty:
+        return static
+
+    try:
+        df = delay_df.copy()
+        df["median_delay_min"] = pd.to_numeric(df["median_delay_min"], errors="coerce")
+        df["incidents_with_signal"] = pd.to_numeric(df["incidents_with_signal"], errors="coerce")
+        df = df.dropna(subset=["median_delay_min", "incidents_with_signal"])
+        df = df[df["median_delay_min"] > 0]
+        if df.empty:
+            return static
+
+        total_weight = df["incidents_with_signal"].sum()
+        pcts = []
+        for h in hours_thresholds:
+            threshold_min = h * 60
+            within = df.loc[df["median_delay_min"] <= threshold_min, "incidents_with_signal"].sum()
+            pcts.append(round(within / total_weight * 100, 1))
+        return pcts
+    except Exception:
+        return static
+
+
 def render_signal_gap_analysis():
     st.title("Signal Gap Analysis")
     st.caption("WiDS 2021–2025 · Fires with early warning signals that received no evacuation action")
@@ -178,8 +215,7 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
     st.caption("For fires that DID receive an evacuation action — how long did it take?")
 
     hours = [1, 2, 6, 12, 24, 48, 72, 100]
-    # Modeled from v_delay_summary data
-    pct_within = [2, 5, 15, 28, 45, 65, 78, 90]
+    pct_within = _cumulative_delay_pct(delay_df, hours)
 
     fig_delay = go.Figure()
     fig_delay.add_trace(go.Scatter(

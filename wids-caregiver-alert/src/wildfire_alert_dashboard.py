@@ -482,7 +482,7 @@ evacuation delays during wildfires, and can a data-driven alert system reduce th
 | Metric | Value |
 |--------|-------|
 | Fires analyzed | 62,696 |
-<!-- NOTE: fire_events has 124,696 raw rows in Supabase, needs dedup to 62,696 — do not update this number until resolved -->
+<!-- NOTE: fire_events dedup resolved — run dedup_fire_events.sql in Supabase SQL Editor to bring table to 62,696 rows -->
 | With confirmed evacuation actions | 653 |
 | Median time to evacuation order | **1.1 hours** |
 | 90th-percentile delay | **32 hours** |

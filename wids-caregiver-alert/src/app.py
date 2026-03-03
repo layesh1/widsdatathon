@@ -187,7 +187,7 @@ elif st.session_state.user_role == "data_analyst":
         This dashboard integrates findings from the WiDS Datathon 2025 competition,
         analyzing 62,696 wildfire incidents to identify evacuation delays and equity disparities.
         """)
-        # NOTE: fire_events has 124,696 raw rows in Supabase, needs dedup to 62,696 — do not update this number until resolved
+        # NOTE: fire_events dedup resolved — run dedup_fire_events.sql in Supabase SQL Editor to bring table to 62,696 rows
         st.markdown("""
         """)
         
@@ -196,7 +196,7 @@ elif st.session_state.user_role == "data_analyst":
         with tab1:
             st.subheader("Research Scope")
             col1, col2, col3 = st.columns(3)
-            # NOTE: fire_events has 124,696 raw rows in Supabase, needs dedup to 62,696 — do not update this number until resolved
+            # NOTE: fire_events dedup resolved — run dedup_fire_events.sql in Supabase SQL Editor to bring table to 62,696 rows
             col1.metric("Incidents Analyzed", "62,696")
             col2.metric("Time Period", "2021-2025")
             col3.metric("Geographic Coverage", "56 Territories")

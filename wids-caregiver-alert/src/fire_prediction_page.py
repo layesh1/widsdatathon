@@ -267,7 +267,7 @@ def render_fire_prediction_page(role="analyst"):
                 showlakes=True,
                 showcountries=True,
                 showsubunits=True,
-                projection=dict(type="albers usa")
+                projection_type="albers usa",
             ),
             height=480,
             margin=dict(l=0, r=0, t=40, b=0),
