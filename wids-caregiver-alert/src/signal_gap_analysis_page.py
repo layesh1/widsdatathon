@@ -82,10 +82,22 @@ def render_signal_gap_analysis():
     st.divider()
     k1, k2, k3, k4 = st.columns(4)
 
-    incidents = int(kpi.get("incidents_with_signal", FALLBACK_STATS["incidents_with_signal"]))
-    pct_missing = float(kpi.get("pct_missing_action", FALLBACK_STATS["pct_missing_action"]))
-    median_min = float(kpi.get("median_delay_min", FALLBACK_STATS["median_delay_min"]))
-    p90_min = float(kpi.get("p90_delay_min", FALLBACK_STATS["p90_delay_min"]))
+    try:
+        incidents = int(kpi.get("incidents_with_signal", FALLBACK_STATS["incidents_with_signal"]))
+    except (TypeError, ValueError):
+        incidents = FALLBACK_STATS["incidents_with_signal"]
+    try:
+        pct_missing = float(kpi.get("pct_missing_action", FALLBACK_STATS["pct_missing_action"]))
+    except (TypeError, ValueError):
+        pct_missing = FALLBACK_STATS["pct_missing_action"]
+    try:
+        median_min = float(kpi.get("median_delay_min", FALLBACK_STATS["median_delay_min"]))
+    except (TypeError, ValueError):
+        median_min = FALLBACK_STATS["median_delay_min"]
+    try:
+        p90_min = float(kpi.get("p90_delay_min", FALLBACK_STATS["p90_delay_min"]))
+    except (TypeError, ValueError):
+        p90_min = FALLBACK_STATS["p90_delay_min"]
 
     pct_acting = (1 - pct_missing) * 100
     no_action = int(incidents * pct_missing)
