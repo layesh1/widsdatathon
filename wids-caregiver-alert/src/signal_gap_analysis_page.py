@@ -51,7 +51,7 @@ def load_gap_data():
         delay_res = (
             sb.table("v_delay_summary_by_region_source")
             .select("region_id,source_attribution,external_status,incidents_with_signal,median_delay_min,p90_delay_min")
-            .gt("incidents_with_signal", 2)
+            .gt("incidents_with_signal", 0)
             .limit(200)
             .execute()
         )
