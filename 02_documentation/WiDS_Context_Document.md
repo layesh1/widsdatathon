@@ -275,7 +275,12 @@ git push layesh1 main
 ---
 
 ## Future Work (Pre-April Conference)
-
+✅ Fix directions_page.py syntax error — done
+✅ Database backend for evacuee tracker — just done
+Zone duration — zone_duration_page.py degrades to known stats because the 332MB CSV isn't deployed. This requires either uploading to Supabase or keeping as-is with graceful degradation
+Deploy geo_events_geoevent.csv to Streamlit Cloud — enables the 🟢 WiDS live source instead of 🟡 FIRMS. File is large so it needs to go into Supabase
+Combine Lena + Katie maps / faster fire loading — need Katie's code first
+Check WiDS data for what else can be used — exploratory, needs discussion
 - [ ] Agency coverage gap metric — geo_events_externalgeoeventchangelog.csv, multi-agency reporting as severity proxy
 - [ ] Alert channel equity — geo_events_externalgeoevent.csv channel data, show manual vs automated coverage by county
 - [ ] Live incident feed — replace NASA FIRMS fallback with geo_events_geoevent.csv is_active fires
