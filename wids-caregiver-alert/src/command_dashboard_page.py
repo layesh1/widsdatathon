@@ -17,6 +17,15 @@ import plotly.graph_objects as go
 import plotly.figure_factory as ff
 from pathlib import Path
 
+# ── Plotly version shim: 5.x uses Scattermapbox/mapbox; 6.x uses Scattermap/map ──
+_HAS_NEW_MAP = hasattr(go, "Scattermap")
+_MAP_KEY = "map" if _HAS_NEW_MAP else "mapbox"
+
+
+def _scatter_map(**kw):
+    """Return Scattermap (Plotly 6.x / 5.20+) or Scattermapbox (5.x)."""
+    return go.Scattermap(**kw) if _HAS_NEW_MAP else go.Scattermapbox(**kw)
+
 
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
@@ -238,21 +247,35 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
         hex_df = _build_hex_data(fire_data, state_filter)
         svi_df = load_svi_centroids()
 
+        # Map center / zoom by state filter (needed below)
+        clat, clon, czoom = _STATE_CENTERS.get(state_filter, (39.5, -98.5, 3))
+
         if len(hex_df) >= 5:
-            hex_fig = ff.create_hexbin_mapbox(
-                data_frame=hex_df,
-                lat="lat",
-                lon="lon",
-                nx_hexagon=40,
-                opacity=0.72,
-                labels={"color": "Fire Events"},
-                show_original_data=False,
-                color_continuous_scale="YlOrRd",
-                min_count=1,
-            )
+            try:
+                hex_fig = ff.create_hexbin_mapbox(
+                    data_frame=hex_df,
+                    lat="lat",
+                    lon="lon",
+                    nx_hexagon=40,
+                    opacity=0.72,
+                    labels={"color": "Fire Events"},
+                    show_original_data=False,
+                    color_continuous_scale="YlOrRd",
+                    min_count=1,
+                )
+            except Exception:
+                # Plotly 6.x removed create_hexbin_mapbox internals — fall to density scatter
+                hex_fig = go.Figure(_scatter_map(
+                    lat=hex_df["lat"].tolist(),
+                    lon=hex_df["lon"].tolist(),
+                    mode="markers",
+                    marker=dict(size=4, color="#FF4400", opacity=0.25),
+                    name="Fire Events",
+                    hoverinfo="none",
+                ))
         else:
             # Sparse / no data — plain scatter fallback
-            hex_fig = go.Figure(go.Scattermapbox(
+            hex_fig = go.Figure(_scatter_map(
                 lat=hex_df["lat"].tolist() if len(hex_df) else [39.5],
                 lon=hex_df["lon"].tolist() if len(hex_df) else [-98.5],
                 mode="markers",
@@ -266,7 +289,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
             if state_filter != "All" and "ST_ABBR" in fsvi.columns:
                 fsvi = fsvi[fsvi["ST_ABBR"] == state_filter]
             if len(fsvi) > 0:
-                hex_fig.add_trace(go.Scattermapbox(
+                hex_fig.add_trace(_scatter_map(
                     lat=fsvi["LATITUDE"].tolist(),
                     lon=fsvi["LONGITUDE"].tolist(),
                     mode="markers",
@@ -279,15 +302,12 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                     hoverinfo="text",
                 ))
 
-        # Map center / zoom by state filter
-        clat, clon, czoom = _STATE_CENTERS.get(state_filter, (39.5, -98.5, 3))
-
         hex_fig.update_layout(
-            mapbox=dict(
+            **{_MAP_KEY: dict(
                 style="carto-darkmatter",
                 center=dict(lat=clat, lon=clon),
                 zoom=czoom,
-            ),
+            )},
             height=560,
             margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="#0f0f1a",
@@ -299,9 +319,8 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 x=0, y=1,
             ),
             coloraxis_colorbar=dict(
-                title="Fire<br>Events",
+                title=dict(text="Fire<br>Events", font=dict(color="#eee")),
                 tickfont=dict(color="#eee"),
-                titlefont=dict(color="#eee"),
                 thickness=14,
             ),
         )
