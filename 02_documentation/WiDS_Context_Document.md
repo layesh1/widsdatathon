@@ -2,7 +2,7 @@
 ## WiDS Datathon 2025 · Wildfire Caregiver Alert System
 ### Project Data & Code Reference — Context Document for Future Chats
 
-*Last updated: 2026-03-04*
+*Last updated: 2026-03-03*
 
 ---
 
@@ -203,7 +203,7 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ Added caregiver access codes: DISPATCH-2025, ANALYST-WiDS9
 - ✅ Fixed geo_event_id type mismatch ("22429.0" vs "22429")
 
-### Session 4 (Most Recent — 2026-03)
+### Session 4 (2026-03)
 - ✅ **Emoji removal** — stripped decorative emoji from all 13 dashboard pages; kept page_icon="🔥", icon= params, and data values like "Evacuated ✅"
 - ✅ **Streamlit 1.50 deprecation fix** — `st.image(use_container_width=True)` → `st.image(width="stretch")` in wildfire_alert_dashboard.py and auth_supabase.py
 - ✅ **HTML comment render fix** — removed `<!-- NOTE: fire_events dedup resolved -->` from st.markdown() in analyst About page (was rendering as visible text)
@@ -213,24 +213,36 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ **Cached data loaders** — added @st.cache_data to load_svi_centroids() and new load_geo_events() (ttl=900s) in command_dashboard_page.py
 - ✅ All pushed to GitHub (commit 2780fbc)
 
+### Session 5 (2026-03-03)
+- ✅ **Fire Predictor ValueError** — fixed `projection_type="albers usa"` → `projection=dict(type="albers usa")` in fire_prediction_page.py for Plotly 6.x compatibility
+- ✅ **v_dangerous_delay_candidates LIMIT** — LIMIT 500 already present in signal_gap_analysis_page.py (confirmed in code review); Supabase index still needed for full fix
+- ✅ **Hours-to-warning and hours-to-advisory** — added 3-tier notification timeline chart to signal_gap_analysis_page.py; advisory 6.21h / warning 1.50h / order 1.10h medians with bar chart showing caregiver alert fires before all tiers
+- ✅ **SVI sub-theme breakdown** — added per-county sub-theme bar chart (socioeconomic, household, minority, housing) to risk_calculator_page.py; svi_minority has strongest delay correlation; updated HIGH_RISK_COUNTIES with sub-theme + population data for all 9 counties
+- ✅ **Temporal fire pattern page** — created temporal_fire_pattern_page.py (new analyst tab): hour-of-day bar (peak 9pm/6,131 fires), monthly bar (July/13,650), hour×month heatmap, equity implication section; added to wildfire_alert_dashboard.py nav
+- ✅ **Extreme fires with no evacuation** — added donut chart + metrics to signal_gap_analysis_page.py: 298 extreme-spread fires, 211 (70.8%) no evacuation action
+- ✅ **Fire perimeter data quality note** — added expandable data quality expander to command_dashboard_page.py: 6,207 records, 4,139 approved, 883 rejected, 1,185 pending (33.5% not approved)
+- ✅ **Silent Fire explainer** — added "Silent Fires: The 73% Story" section to signal_gap_analysis_page.py with bar chart (46,053 silent vs 16,643 normal), metrics, and equity narrative
+- ✅ **Population breakdown in county risk** — added stacked bar (age 65+, disability, poverty, no vehicle) to risk_calculator_page.py alongside SVI sub-theme breakdown
+- ✅ All pushed to GitHub
+
 ---
 
 ## Current To-Do List (Pre-April Conference)
 
 ### Bugs to Fix
-- ⬜ **Fire Predictor ValueError** — fire_prediction_page.py ~line 261, plotly update_layout syntax error in `showstates` / geo projection
-- ⬜ **v_dangerous_delay_candidates timeout** — add `LIMIT 500` or a composite index on (geo_event_id, date_created) on the Supabase view
+- ✅ **Fire Predictor ValueError** — fixed `projection=dict(type="albers usa")` in fire_prediction_page.py (session 5)
+- ✅ **v_dangerous_delay_candidates timeout** — LIMIT 500 confirmed in code; ⬜ composite index on (geo_event_id, date_created) still needed in Supabase SQL editor
 - ⬜ **Signal Gap live Supabase data** — v_dangerous_delay_candidates currently falls back to hardcoded stats; fix the view performance so live data flows through
 
 ### High-Impact Data Enhancements (from raw data analysis)
-- ⬜ **Hours-to-warning and hours-to-advisory** — fire_events_with_svi_and_delays.csv has `hours_to_warning` and `hours_to_advisory` columns, not just `hours_to_order`. Dashboard only shows order delays. Adding warning/advisory timelines reveals an earlier intervention window (~30–45 min before order)
-- ⬜ **SVI sub-theme breakdown** — dataset has `svi_socioeconomic`, `svi_household`, `svi_minority`, `svi_housing` — identify which vulnerability dimension drives delay most; enhance risk calculator to show which sub-theme is the primary risk driver
-- ⬜ **Temporal fire pattern page** — add hour-of-day fire distribution (peak 8pm–midnight) and monthly seasonality (July peak: 13,650 fires) as a new analyst tab; this is an untapped story in the raw data
-- ⬜ **Extreme fires with no evacuation** — 211 of 298 extreme-spread fires received no evacuation action; these are the highest-risk events and currently invisible in the dashboard
+- ✅ **Hours-to-warning and hours-to-advisory** — 3-tier timeline (advisory 6.21h / warning 1.50h / order 1.10h) added to signal_gap_analysis_page.py (session 5)
+- ✅ **SVI sub-theme breakdown** — per-county sub-theme bar chart + primary driver label added to risk_calculator_page.py; svi_minority strongest correlate (session 5)
+- ✅ **Temporal fire pattern page** — temporal_fire_pattern_page.py created; hour-of-day + monthly + heatmap + equity narrative; wired into analyst nav (session 5)
+- ✅ **Extreme fires with no evacuation** — donut + metrics (211/298, 70.8%) added to signal_gap_analysis_page.py (session 5)
 - ⬜ **Channel coverage map** — external geoevent `channel` column has region-level incident channels (incidents-ca_s4, incidents-montana, etc.); build a county-level map showing which counties have multi-channel coverage vs single-channel dependency
-- ⬜ **Silent fire escalation tracker** — 46,053 fires are "silent"; build a view showing how many progress from silent → normal notification → order; the conversion rate is near-zero and that's the central equity argument
-- ⬜ **Fire perimeter data quality note** — 883 rejected + 1,185 pending out of 6,207 perimeter records (33.5% not approved); surface this as a data quality indicator in the Command Dashboard
-- ⬜ **Population breakdown in county risk** — pop_age65, pop_disability, pop_poverty, pop_no_vehicle are in the processed data; add a stacked bar showing composition of vulnerable population per county in the risk calculator
+- ⬜ **Silent fire escalation tracker** — build a Supabase view showing silent → normal → order conversion rates (near-zero); the simple bar explainer is in signal_gap_analysis_page.py but the tracker view is unbuilt
+- ✅ **Fire perimeter data quality note** — expander added to command_dashboard_page.py (session 5)
+- ✅ **Population breakdown in county risk** — stacked bar (age65 / disability / poverty / no-vehicle) added to risk_calculator_page.py (session 5)
 - ⬜ **USFA registry** — download from apps.usfa.fema.gov/registry/download, save as src/usfa-registry-national.csv; enables full Fire Dept Resources tab
 
 ### Application Architecture (Medium-Term)
@@ -242,7 +254,7 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ⬜ **IRWIN incident linkage** — fire_perimeters have `IRWINID` in source_extra_data JSON; this is the national incident ID used by USFS, BLM, CAL FIRE; linking would give access to official resource allocation, crew assignments, and suppression costs
 
 ### Conference Presentation Priorities
-- ⬜ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding (slides + dashboard callout)
+- ✅ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding — added to signal_gap_analysis_page.py (session 5)
 - ⬜ Build a county-level drill-down: click a county → see its SVI tier, fire history, active alert channels, USFA department count, and caregiver coverage estimate
 - ⬜ Getis-Ord Gi* visualization — currently only mentioned in context; implement the actual hotspot cluster map showing where delayed evacuation clusters appear statistically
 - ⬜ Finalize Katie's map integration (referenced in old to-do; need her code)

@@ -220,6 +220,26 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
     h3.metric("Fires Exceeding 6h",         "20%",    delta="critical window", delta_color="inverse")
     h4.metric("Vuln County Growth Rate",    "11.7 ac/hr", delta="+17% vs non-vuln", delta_color="inverse")
 
+    # ── Fire Perimeter Data Quality ───────────────────────────────────────────
+    with st.expander("Fire Perimeter Data Quality (6,207 records)", expanded=False):
+        dq1, dq2, dq3, dq4 = st.columns(4)
+        dq1.metric("Total Perimeter Records", "6,207",
+                   help="GIS fire perimeter records in WiDS dataset")
+        dq2.metric("Approved", "4,139",
+                   delta="66.7% approved", delta_color="normal",
+                   help="Perimeter records with approved status")
+        dq3.metric("Rejected", "883",
+                   delta="14.2% rejected", delta_color="inverse",
+                   help="Perimeter records rejected from official data")
+        dq4.metric("Pending Review", "1,185",
+                   delta="19.1% pending", delta_color="off",
+                   help="Perimeter records still awaiting approval")
+        st.caption(
+            "33.5% of fire perimeter records are not yet approved (rejected + pending). "
+            "Analyses using perimeter shape data should account for this data quality limitation. "
+            "Source: fire_perimeters_gis_fireperimeter table, WiDS 2025."
+        )
+
     st.divider()
 
     # ── Tabs ─────────────────────────────────────────────────────────────────

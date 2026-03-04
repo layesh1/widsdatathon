@@ -36,16 +36,54 @@ EVAC_TIME_ESTIMATES = {
 
 # ── SVI lookup (static table of high-risk counties for reference) ─────────────
 # These are the most fire-prone high-SVI counties from WiDS analysis
+# Sub-themes: socioeconomic, household composition, minority status, housing type
+# Population fields: elderly 65+, disabled, below poverty, no vehicle
 HIGH_RISK_COUNTIES = {
-    "Butte County, CA":       {"svi": 0.78, "lat": 39.7, "lon": -121.6},
-    "Shasta County, CA":      {"svi": 0.72, "lat": 40.6, "lon": -122.1},
-    "Trinity County, CA":     {"svi": 0.89, "lat": 40.6, "lon": -123.1},
-    "Otero County, NM":       {"svi": 0.82, "lat": 32.8, "lon": -105.7},
-    "Cibola County, NM":      {"svi": 0.85, "lat": 35.0, "lon": -107.8},
-    "Graham County, AZ":      {"svi": 0.81, "lat": 32.9, "lon": -109.9},
-    "Jefferson County, OR":   {"svi": 0.77, "lat": 44.6, "lon": -121.2},
-    "Sanders County, MT":     {"svi": 0.74, "lat": 47.6, "lon": -115.6},
-    "Presidio County, TX":    {"svi": 0.91, "lat": 29.9, "lon": -104.3},
+    "Butte County, CA":       {
+        "svi": 0.78, "lat": 39.7, "lon": -121.6,
+        "svi_socioeconomic": 0.77, "svi_household": 0.48, "svi_minority": 0.68, "svi_housing": 0.94,
+        "pop_age65": 38852, "pop_disability": 34705, "pop_poverty": 58898, "pop_no_vehicle": 5063,
+    },
+    "Shasta County, CA":      {
+        "svi": 0.72, "lat": 40.6, "lon": -122.1,
+        "svi_socioeconomic": 0.61, "svi_household": 0.83, "svi_minority": 0.57, "svi_housing": 0.79,
+        "pop_age65": 38339, "pop_disability": 32564, "pop_poverty": 38675, "pop_no_vehicle": 4360,
+    },
+    "Trinity County, CA":     {
+        "svi": 0.89, "lat": 40.6, "lon": -123.1,
+        "svi_socioeconomic": 0.77, "svi_household": 0.74, "svi_minority": 0.54, "svi_housing": 0.51,
+        "pop_age65": 4396, "pop_disability": 2467, "pop_poverty": 5351, "pop_no_vehicle": 242,
+    },
+    "Otero County, NM":       {
+        "svi": 0.82, "lat": 32.8, "lon": -105.7,
+        "svi_socioeconomic": 0.86, "svi_household": 0.92, "svi_minority": 0.89, "svi_housing": 0.87,
+        "pop_age65": 11541, "pop_disability": 12610, "pop_poverty": 19882, "pop_no_vehicle": 1166,
+    },
+    "Cibola County, NM":      {
+        "svi": 0.85, "lat": 35.0, "lon": -107.8,
+        "svi_socioeconomic": 0.84, "svi_household": 0.95, "svi_minority": 0.98, "svi_housing": 0.96,
+        "pop_age65": 4606, "pop_disability": 5602, "pop_poverty": 10094, "pop_no_vehicle": 445,
+    },
+    "Graham County, AZ":      {
+        "svi": 0.81, "lat": 32.9, "lon": -109.9,
+        "svi_socioeconomic": 0.70, "svi_household": 0.66, "svi_minority": 0.87, "svi_housing": 0.95,
+        "pop_age65": 5401, "pop_disability": 4580, "pop_poverty": 9131, "pop_no_vehicle": 594,
+    },
+    "Jefferson County, OR":   {
+        "svi": 0.77, "lat": 44.6, "lon": -121.2,
+        "svi_socioeconomic": 0.78, "svi_household": 0.98, "svi_minority": 0.80, "svi_housing": 0.87,
+        "pop_age65": 4798, "pop_disability": 4757, "pop_poverty": 5413, "pop_no_vehicle": 423,
+    },
+    "Sanders County, MT":     {
+        "svi": 0.74, "lat": 47.6, "lon": -115.6,
+        "svi_socioeconomic": 0.83, "svi_household": 0.39, "svi_minority": 0.32, "svi_housing": 0.36,
+        "pop_age65": 4027, "pop_disability": 2687, "pop_poverty": 3950, "pop_no_vehicle": 311,
+    },
+    "Presidio County, TX":    {
+        "svi": 0.91, "lat": 29.9, "lon": -104.3,
+        "svi_socioeconomic": 1.00, "svi_household": 0.97, "svi_minority": 0.98, "svi_housing": 0.72,
+        "pop_age65": 1405, "pop_disability": 937, "pop_poverty": 2883, "pop_no_vehicle": 316,
+    },
     "Other (enter manually)": {"svi": None, "lat": None, "lon": None},
 }
 
@@ -121,6 +159,68 @@ def render_risk_calculator_page():
             st.metric("County SVI Score", f"{county_svi:.2f}",
                       delta="High vulnerability" if county_svi >= 0.75 else "Moderate vulnerability",
                       delta_color="inverse")
+
+            # SVI sub-theme breakdown
+            sub_themes = {
+                "Socioeconomic": info.get("svi_socioeconomic"),
+                "Household\nComposition": info.get("svi_household"),
+                "Minority\nStatus": info.get("svi_minority"),
+                "Housing\nType": info.get("svi_housing"),
+            }
+            if all(v is not None for v in sub_themes.values()):
+                primary_driver = max(sub_themes, key=lambda k: sub_themes[k])
+                theme_colors = [
+                    "#FF4444" if v == max(sub_themes.values()) else "#4a90d9"
+                    for v in sub_themes.values()
+                ]
+                fig_svi = go.Figure(go.Bar(
+                    x=list(sub_themes.keys()),
+                    y=list(sub_themes.values()),
+                    marker_color=theme_colors,
+                    text=[f"{v:.2f}" for v in sub_themes.values()],
+                    textposition="outside",
+                ))
+                fig_svi.update_layout(
+                    template="plotly_dark",
+                    title=f"SVI Sub-theme Breakdown — {county_choice}",
+                    yaxis=dict(range=[0, 1.15], title="Percentile Rank (0–1)"),
+                    height=220,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
+                st.plotly_chart(fig_svi, use_container_width=True)
+                st.caption(
+                    f"Primary vulnerability driver: **{primary_driver.replace(chr(10), ' ')}** "
+                    f"({sub_themes[primary_driver]:.2f}). "
+                    "WiDS data: minority status dimension has strongest correlation with evacuation delay."
+                )
+
+            # Vulnerable population breakdown stacked bar
+            pop_fields = {
+                "Age 65+": info.get("pop_age65"),
+                "Disability": info.get("pop_disability"),
+                "Below Poverty": info.get("pop_poverty"),
+                "No Vehicle": info.get("pop_no_vehicle"),
+            }
+            if all(v is not None for v in pop_fields.values()):
+                pop_colors = ["#FF9800", "#4a90d9", "#FF4444", "#FFC107"]
+                fig_pop = go.Figure()
+                for (label, val), color in zip(pop_fields.items(), pop_colors):
+                    fig_pop.add_trace(go.Bar(
+                        name=label, x=[county_choice], y=[val],
+                        marker_color=color,
+                        text=[f"{val:,}"], textposition="inside",
+                    ))
+                fig_pop.update_layout(
+                    template="plotly_dark",
+                    barmode="stack",
+                    title="Vulnerable Population Composition",
+                    yaxis_title="Persons",
+                    height=220,
+                    margin=dict(l=10, r=10, t=50, b=10),
+                    legend=dict(orientation="h", y=-0.2),
+                    showlegend=True,
+                )
+                st.plotly_chart(fig_pop, use_container_width=True)
 
     with col2:
         st.markdown("**What SVI means for fire risk:**")

@@ -313,6 +313,190 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
         )
         st.plotly_chart(fig_agency, use_container_width=True)
 
+    # ── Warning / Advisory / Order timeline ──────────────────────────────────
+    st.divider()
+    st.subheader("3-Tier Evacuation Timeline")
+    st.caption(
+        "When fires DO receive notification, here is how long each tier takes from ignition — "
+        "across 62,696 fire events with SVI data (WiDS 2021–2025)"
+    )
+
+    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+    col_t1.metric(
+        "Caregiver Alert (signal)",
+        "< 1h",
+        delta="Before any official tier",
+        delta_color="normal",
+        help="A caregiver alert system activates at signal detection — before official orders are issued."
+    )
+    col_t2.metric(
+        "Evacuation Order",
+        "1.1h median",
+        delta="653 fires received orders",
+        delta_color="off",
+        help="Mandatory 'leave now' — median 1.10h from ignition (n=653)"
+    )
+    col_t3.metric(
+        "Evacuation Warning",
+        "1.5h median",
+        delta="715 fires received warnings",
+        delta_color="off",
+        help="Voluntary evacuation — median 1.50h from ignition (n=715)"
+    )
+    col_t4.metric(
+        "Evacuation Advisory",
+        "6.2h median",
+        delta="356 fires received advisories",
+        delta_color="off",
+        help="Informational advisory — median 6.21h from ignition (n=356)"
+    )
+
+    # Waterfall / timeline bar
+    fig_tiers = go.Figure()
+    tiers = ["Caregiver Alert\n(signal)", "Evacuation Order\n(mandatory)", "Evacuation Warning\n(voluntary)", "Evacuation Advisory\n(informational)"]
+    times = [0.5, 1.10, 1.50, 6.21]
+    colors = ["#4ade80", "#FF4444", "#FF9800", "#FFC107"]
+    for t, tm, c in zip(tiers, times, colors):
+        fig_tiers.add_trace(go.Bar(
+            x=[t], y=[tm],
+            marker_color=c,
+            text=[f"{tm}h"],
+            textposition="outside",
+            showlegend=False,
+        ))
+    fig_tiers.add_hline(
+        y=0.85,
+        line_dash="dot", line_color="#4ade80",
+        annotation_text="Caregiver alert activates here (+0.85h head start)",
+        annotation_position="top right"
+    )
+    fig_tiers.update_layout(
+        template="plotly_dark",
+        title="Median Time from Ignition to Each Notification Tier",
+        yaxis_title="Hours from Ignition",
+        height=340,
+        margin=dict(l=40, r=40, t=60, b=60),
+        barmode="group",
+    )
+    st.plotly_chart(fig_tiers, use_container_width=True)
+    st.caption(
+        "Orders (1.1h) and Warnings (1.5h) are close together — fires that escalate fast. "
+        "Advisories (6.2h) are issued later for slower-burning or adjacent-zone fires. "
+        "**A caregiver alert at signal detection predates all three tiers**, giving vulnerable populations the head start they need."
+    )
+
+    # ── Extreme fires with no evacuation ─────────────────────────────────────
+    st.divider()
+    st.subheader("Extreme-Spread Fires: The Highest-Risk Gap")
+    st.caption("Fires classified 'extreme' spread rate by incident commanders — and whether they received any evacuation action")
+
+    col_ex1, col_ex2, col_ex3 = st.columns(3)
+    col_ex1.metric(
+        "Extreme-Spread Fires (WiDS)",
+        "298",
+        help="Fires where field commanders reported 'extreme' spread rate — faster than a person can run"
+    )
+    col_ex2.metric(
+        "Received NO Evacuation Action",
+        "211",
+        delta="70.8% of extreme fires",
+        delta_color="inverse",
+        help="Of 298 extreme-spread fires, 211 received no order, warning, or advisory"
+    )
+    col_ex3.metric(
+        "Received Evacuation Action",
+        "87",
+        delta="only 29.2%",
+        delta_color="off",
+    )
+
+    fig_extreme = go.Figure(go.Pie(
+        labels=["No Evacuation Action", "Evacuation Action Taken"],
+        values=[211, 87],
+        hole=0.55,
+        marker_colors=["#FF4444", "#4ade80"],
+        textinfo="label+percent",
+        textfont_size=13,
+    ))
+    fig_extreme.update_layout(
+        template="plotly_dark",
+        height=280,
+        margin=dict(l=10, r=10, t=10, b=10),
+        showlegend=False,
+        annotations=[dict(
+            text="70.8%<br>No Action",
+            x=0.5, y=0.5, font_size=15, showarrow=False,
+            font_color="#FF4444"
+        )]
+    )
+    st.plotly_chart(fig_extreme, use_container_width=True)
+
+    st.markdown("""
+> **"Extreme" spread rate** is defined by field commanders as fires that spread *faster than a person can run.*
+> These are the highest-risk events in the dataset — and **211 of 298 received no evacuation action at all.**
+> This is the most critical gap for a proactive caregiver alert system.
+    """)
+
+    # ── Silent fire explainer ─────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Silent Fires: The 73% Story")
+    st.caption("The single most important equity finding from the WiDS 2021–2025 dataset")
+
+    col_s1, col_s2, col_s3 = st.columns(3)
+    col_s1.metric(
+        "'Silent' Fires",
+        "46,053",
+        delta="73.5% of all fires",
+        delta_color="inverse",
+        help="Fires with no external notification — detected internally, never reached the public"
+    )
+    col_s2.metric(
+        "'Normal' Fires (public notification)",
+        "16,643",
+        delta="26.5% of all fires",
+        delta_color="off",
+    )
+    col_s3.metric(
+        "Silent → Evacuation Action",
+        "< 0.1%",
+        delta="Conversion rate near zero",
+        delta_color="inverse",
+        help="Of 46,053 silent fires, virtually none resulted in a public evacuation action"
+    )
+
+    fig_silent = go.Figure()
+    fig_silent.add_trace(go.Bar(
+        x=["Silent (no public notification)", "Normal (public notification)"],
+        y=[46053, 16643],
+        marker_color=["#FF4444", "#4a90d9"],
+        text=["46,053\n(73.5%)", "16,643\n(26.5%)"],
+        textposition="outside",
+    ))
+    fig_silent.update_layout(
+        template="plotly_dark",
+        title="Fire Notification Type Distribution — WiDS 2021–2025 (62,696 fires)",
+        yaxis_title="Number of Fires",
+        height=320,
+        margin=dict(l=40, r=20, t=50, b=40),
+    )
+    st.plotly_chart(fig_silent, use_container_width=True)
+
+    st.markdown("""
+**What "silent" means:** The fire was detected and tracked internally in the WatchDuty system,
+but no external public notification was ever issued. No alert to residents. No advisory to caregivers.
+No warning on weather apps.
+
+**For vulnerable populations**, this means:
+- No knowledge that a fire exists nearby
+- No time to arrange accessible transportation
+- No opportunity to secure medical equipment or medications
+- No ability to call for caregiver assistance
+
+**The caregiver alert system targets this exact gap** — monitoring silent fire signals and
+proactively notifying caregivers before the fire escalates to an official notification tier.
+The 73% statistic is the central equity argument: **the system is already failing 3 in 4 fire events.**
+    """)
+
     # ── Key takeaway ─────────────────────────────────────────────────────────
     st.divider()
     st.subheader("Key Takeaway for Caregiver Alert System")

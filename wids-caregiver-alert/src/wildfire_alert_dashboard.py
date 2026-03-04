@@ -438,7 +438,8 @@ with st.sidebar:
         pages = [
             "About", "Equity Analysis", "Risk Calculator",
             "Impact Projection", "Coverage Analysis",
-            "Zone Duration", "Fire Predictor", "Data Governance", "Signal Gap Analysis",
+            "Zone Duration", "Fire Predictor", "Data Governance",
+            "Signal Gap Analysis", "Temporal Fire Patterns",
         ]
 
     if "current_page" not in st.session_state or st.session_state.current_page not in pages:
@@ -812,6 +813,10 @@ def _render_page():
     elif page == "Signal Gap Analysis":
         from signal_gap_analysis_page import render_signal_gap_analysis
         render_signal_gap_analysis()
+
+    elif page == "Temporal Fire Patterns":
+        from temporal_fire_pattern_page import render_temporal_fire_patterns
+        render_temporal_fire_patterns()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
