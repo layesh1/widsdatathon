@@ -74,12 +74,33 @@ def load_svi_centroids():
 
 def load_usfa():
     for p in [Path("usfa-registry-national.csv"),
-               Path("01_raw_data/usfa-registry-national.csv")]:
+               Path("src/usfa-registry-national.csv"),
+               Path("01_raw_data/usfa-registry-national.csv"),
+               Path("../01_raw_data/usfa-registry-national.csv")]:
         if p.exists():
             try:
                 return pd.read_csv(p, low_memory=False)
             except Exception:
                 pass
+    # Try downloading from USFA API as last resort
+    try:
+        import requests
+        from io import StringIO
+        r = requests.get(
+            "https://apps.usfa.fema.gov/registry/rest/api/v1/firedepartments/download",
+            timeout=15,
+            headers={"Accept": "text/csv"},
+        )
+        if r.status_code == 200 and b"," in r.content[:100]:
+            df = pd.read_csv(StringIO(r.text), low_memory=False)
+            # Cache locally for next time
+            try:
+                df.to_csv(Path("usfa-registry-national.csv"), index=False)
+            except Exception:
+                pass
+            return df
+    except Exception:
+        pass
     return None
 
 
@@ -468,7 +489,13 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 "**USFA National Fire Department Registry not loaded.**\n\n"
                 "To enable this tab: download the registry CSV from "
                 "[apps.usfa.fema.gov/registry/download](https://apps.usfa.fema.gov/registry/download) "
-                "and save it as `usfa-registry-national.csv` in the `src/` directory."
+                "and save it as `usfa-registry-national.csv` in the `src/` directory.\n\n"
+                "The app will also attempt to fetch it automatically on startup if the file is absent."
+            )
+            st.link_button(
+                "Download USFA Registry CSV",
+                "https://apps.usfa.fema.gov/registry/download",
+                help="Save the downloaded file as usfa-registry-national.csv in wids-caregiver-alert/src/"
             )
             # Show summary statistics from USFA quick facts
             st.subheader("USFA Registry — Known Aggregate Statistics")

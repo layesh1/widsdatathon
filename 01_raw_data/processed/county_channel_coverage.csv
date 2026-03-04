@@ -1,0 +1,733 @@
+county_name,n_channels,n_fires_with_channel,state,lat,lon,svi_score
+Ada County,2,107,Idaho,43.546,-116.2425,0.1931
+Adair County,3,68,Oklahoma,35.742,-94.637667,0.9472
+Adams County,8,178,Idaho,44.9339,-116.5404,0.2017
+Aitkin County,1,43,Minnesota,46.512733,-93.324289,0.2838
+Alameda County,1,50,California,37.74467,-122.102868,0.5129
+Alamosa County,2,10,Colorado,37.568916,-105.683871,0.8253
+Albany County,4,70,Wyoming,41.29129,-105.564303,0.2533
+Alfalfa County,2,7,Oklahoma,36.76325,-98.170611,0.3048
+Alpine County,3,75,California,38.723474,-119.817914,0.4044
+Amador County,3,68,California,38.503884,-120.77663,0.5647
+Anderson County,1,23,Texas,31.732817,-95.473883,0.896
+Angelina County,1,30,Texas,31.3095,-95.020883,0.9917
+Anoka County,1,21,Minnesota,45.33278,-93.323436,0.1807
+Apache County,3,206,Arizona,35.68944444,-109.06444444,0.965
+Aransas County,1,9,Texas,27.816521,-97.086549,0.7614
+Arapahoe County,1,1,Colorado,39.745209,-104.621843,0.4661
+Archer County,1,8,Texas,33.647,-98.7064,0.2657
+Archuleta County,5,215,Colorado,37.321967,-107.329033,0.3484
+Ashley County,1,1,Arkansas,33.066451,-92.178384,0.8237
+Asotin County,3,33,Washington,46.1192,-117.2808,0.4283
+Atascosa County,1,2,Texas,29.193056,-98.547222,0.8664
+Atoka County,2,10,Oklahoma,34.4857,-96.0498,0.8556
+Aurora County,1,5,South Dakota,43.5753,-98.70926,0.104
+Austin County,1,3,Texas,29.66773,-96.26688,0.7133
+Avoyelles Parish,1,1,Louisiana,30.809722,-91.963056,0.9682
+Baca County,2,8,Colorado,37.315802,-103.155527,0.5472
+Baker County,2,181,Oregon,44.7135,-117.9956,0.4811
+Bandera County,1,3,Texas,29.80539425100865,-99.07175519982576,0.5899
+Bannock County,3,29,Idaho,43.018621,-112.327082,0.4995
+Barnes County,1,1,North Dakota,46.919696,-97.739874,0.1842
+Barry County,1,5,Missouri,36.610533,-93.79045,0.5768
+Bastrop County,1,14,Texas,30.1519,-97.295,0.7566
+Baxter County,1,3,Arkansas,36.061333,-92.326283,0.4333
+Beadle County,1,4,South Dakota,44.576,-98.3,0.7289
+Bear Lake County,3,17,Idaho,42.5086,-111.134,0.2024
+Beaver County,3,93,Utah,38.2659,-112.6347,0.1457
+Beaverhead County,3,76,Montana,45.3021,-112.966,0.2043
+Becker County,1,39,Minnesota,46.6486,-96.0561,0.3808
+Beckham County,1,2,Oklahoma,35.640703,-99.282731,0.8403
+Bee County,1,11,Texas,28.2645,-97.651,0.9166
+Bell County,1,2,Texas,31.113982,-97.705506,0.937
+Beltrami County,1,110,Minnesota,47.379394,-94.604321,0.755
+Benewah County,2,124,Idaho,47.34,-116.6066,0.6717
+Bennett County,1,14,South Dakota,43.1,-101.575,0.811
+Benson County,1,38,North Dakota,47.965,-99.0825,0.7426
+Bent County,2,3,Colorado,38.03438,-103.201479,0.8804
+Benton County,8,80,Washington,46.2152,-119.3926,0.6405
+Bernalillo County,2,52,New Mexico,35.07401,-106.38452,0.7929
+Big Horn County,5,268,Montana,45.2213,-107.3848,0.7646
+Big Stone County,1,11,Minnesota,45.5185,-96.508583,0.0881
+Billings County,1,12,North Dakota,46.967667,-103.41425,0.0095
+Bingham County,2,18,Idaho,43.127867,-112.467217,0.5469
+Blaine County,8,96,Montana,48.4655556,-108.6261111,0.9443
+Blanco County,1,3,Texas,30.34494,-98.471061,0.2339
+Blue Earth County,1,2,Minnesota,43.992132,-93.899617,0.3831
+Boise County,2,236,Idaho,44.0787,-115.5954,0.1075
+Bonner County,4,137,Idaho,48.223611,-116.139444,0.412
+Bonneville County,2,6,Idaho,43.263667,-111.9685,0.4473
+Boone County,1,1,Missouri,38.782109,-92.26411,0.4244
+Bottineau County,1,4,North Dakota,48.662127,-100.297674,0.111
+Boulder County,2,55,Colorado,40.046417,-105.206883,0.209
+Boundary County,4,133,Idaho,48.57368,-116.038,0.5037
+Bowie County,1,13,Texas,33.457633,-94.1878,0.8766
+Box Elder County,3,122,Utah,41.468967,-112.17225,0.1215
+Brazoria County,1,12,Texas,28.894968,-95.516092,0.6519
+Brazos County,1,1,Texas,30.552166,-96.24616,0.804
+Brewster County,1,4,Texas,29.324722,-103.208056,0.6478
+Briscoe County,1,3,Texas,34.553153,-101.440791,0.5479
+Broadwater County,2,26,Montana,46.327033,-111.330283,0.0827
+Brookings County,1,1,South Dakota,44.43774,-96.98158,0.154
+Brooks County,1,1,Texas,27.381805,-98.155142,0.9163
+Broomfield County,1,3,Colorado,39.96321,-105.1281,0.0436
+Brown County,4,19,Texas,31.90173,-99.151445,0.9135
+Brule County,1,5,South Dakota,43.666278,-99.484167,0.3872
+Buffalo County,1,24,South Dakota,43.973889,-99.266944,0.9892
+Burke County,1,4,North Dakota,48.67475,-102.08266,0.0363
+Burleigh County,1,6,North Dakota,46.7249,-100.52,0.1963
+Burnet County,1,17,Texas,30.648944,-98.228241,0.5819
+Burnett County,1,6,Wisconsin,46.07376,-92.44947,0.1928
+Butler County,1,5,Missouri,36.921575,-90.44089,0.8412
+Butte County,10,154,Idaho,43.589167,-113.116944,0.7009
+Cache County,2,34,Utah,41.82945,-111.6042,0.3478
+Caddo County,2,28,Oklahoma,35.185725,-98.259381,0.8705
+Caddo Parish,1,1,Louisiana,32.392072,-94.107251,0.9329
+Calaveras County,1,23,California,38.175315,-120.811663,0.3357
+Caldwell County,1,9,Texas,29.718715,-97.727643,0.8956
+Calhoun County,2,3,Texas,28.309167,-96.805833,0.72
+Callahan County,1,14,Texas,32.296317,-99.1652,0.2956
+Camas County,2,73,Idaho,43.45563,-114.8026,0.3271
+Cameron County,1,8,Texas,26.089975,-97.353215,0.9844
+Camp County,1,7,Texas,33.053,-95.049,0.917
+Campbell County,3,122,Wyoming,44.352224,-105.195272,0.2367
+Canadian County,2,4,Oklahoma,35.572702,-98.013214,0.3433
+Canyon County,2,10,Idaho,43.5908,-116.7252,0.6217
+Carbon County,9,242,Montana,45.4947943,-108.8727907,0.1241
+Caribou County,2,22,Idaho,42.605867,-112.075167,0.1231
+Carlton County,1,20,Minnesota,46.301041,-92.472027,0.3678
+Carson City,2,27,Nevada,39.231713,-120.08238,0.8508
+Carson County,1,1,Texas,35.4006,-101.568067,0.083
+Carter County,5,81,Montana,45.8171,-104.4088,0.4069
+Carver County,1,4,Minnesota,44.7182,-93.6281,0.0337
+Cascade County,3,24,Montana,47.418417,-111.4653,0.4435
+Cass County,3,74,Texas,32.884467,-94.22225,0.8619
+Cassia County,5,109,Idaho,42.25195,-113.6842,0.56
+Catron County,5,374,New Mexico,33.606783,-108.685,0.4483
+Cavalier County,1,2,North Dakota,48.4814,-98.1958,0.0955
+Chaffee County,3,91,Colorado,38.3691,-106.469,0.6096
+Chambers County,2,14,Texas,29.9116,-94.7909,0.4798
+Charles Mix County,1,7,South Dakota,43.006572,-98.390057,0.6777
+Chase County,1,3,Kansas,38.4325,-96.5575,0.2358
+Chautauqua County,1,3,Kansas,36.821389,-96.267222,0.5781
+Chaves County,2,59,New Mexico,33.581867,-104.207462,0.9701
+Chelan County,3,212,Washington,47.3882,-120.60945,0.7999
+Cherokee County,2,44,Texas,31.90941,-95.33069,0.9717
+Cherry County,1,7,Nebraska,42.708,-101.127,0.3016
+Cheyenne County,1,4,Nebraska,40.818907,-102.820766,0.2857
+Childress County,1,2,Texas,34.469244,-100.088857,0.7178
+Chippewa County,1,4,Minnesota,45.0141,-95.852752,0.6452
+Chisago County,1,35,Minnesota,45.324863,-92.788506,0.0426
+Choctaw County,2,6,Oklahoma,34.100278,-95.365278,0.9485
+Chouteau County,2,6,Montana,47.8863,-110.124,0.2584
+Christian County,1,1,Missouri,36.9077,-93.02495,0.1107
+Churchill County,2,19,Nevada,39.9664,-118.7175,0.6271
+Cibola County,2,97,New Mexico,34.8812,-108.0702,0.9663
+Cimarron County,1,3,Oklahoma,37.033333,-102.6,0.3134
+Clackamas County,3,54,Oregon,45.282306,-122.503278,0.3023
+Clallam County,1,88,Washington,48.07635,-124.2122,0.5861
+Clark County,10,445,Washington,45.65367,-122.3834,0.4257
+Clatsop County,3,17,Oregon,45.876945,-123.927414,0.5813
+Clay County,2,8,Texas,34.045142,-98.298349,0.1772
+Clear Creek County,3,23,Colorado,39.529867,-105.507283,0.1394
+Clearwater County,3,176,Idaho,46.51946,-115.7786,0.5912
+Cleveland County,1,1,Oklahoma,35.210361,-97.195,0.5527
+Coal County,1,2,Oklahoma,34.518611,-96.106944,0.8358
+Cochise County,3,260,Arizona,31.334133,-110.151967,0.9325
+Cochran County,1,1,Texas,33.51777,-103.36533,0.938
+Cocke County,1,1,Tennessee,35.834407,-83.208248,0.7369
+Coconino County,3,706,Arizona,36.0611111,-112.1188889,0.8031
+Codington County,1,12,South Dakota,44.912148,-97.413163,0.2415
+Coffey County,2,11,Kansas,38.324604,-95.923024,0.2743
+Coleman County,1,1,Texas,31.991032,-99.310613,0.6449
+Colfax County,2,34,New Mexico,36.581833,-104.589667,0.7989
+Collingsworth County,1,2,Texas,34.651483,-100.16855,0.8498
+Colorado County,1,1,Texas,29.825897,-96.430845,0.7639
+Columbia County,5,83,Oregon,45.899,-122.7973,0.2453
+Colusa County,3,22,California,39.283529,-122.097176,0.84
+Comanche County,3,28,Oklahoma,34.745617,-98.550633,0.9211
+Conejos County,4,24,Colorado,36.874778,-106.513722,0.8377
+Contra Costa County,1,62,California,37.864546,-122.193649,0.4785
+Converse County,3,67,Wyoming,42.882182,-105.275008,0.2781
+Conway County,1,3,Arkansas,35.573669,-92.812089,0.7461
+Cook County,1,18,Minnesota,47.579867,-90.841703,0.084
+Coos County,3,142,Oregon,43.5778,-124.1861,0.7661
+Corson County,2,11,South Dakota,45.756122,-101.038686,0.7324
+Costilla County,3,18,Colorado,37.6608,-105.330667,0.8727
+Cottle County,2,3,Texas,34.11452,-100.358348,0.6732
+Cottonwood County,1,2,Minnesota,44.009533,-95.239385,0.4903
+Cowlitz County,3,87,Washington,46.16102,-122.8148,0.7124
+Crawford County,2,6,Arkansas,35.7036,-94.3345,0.7531
+Creek County,1,7,Oklahoma,35.927028,-96.500806,0.5205
+Crockett County,2,2,Texas,30.803461,-101.428028,0.4098
+Crook County,6,257,Oregon,44.4263,-121.0173,0.356
+Crow Wing County,1,52,Minnesota,46.340504,-94.391919,0.2087
+Culberson County,1,1,Texas,31.894667,-104.827533,0.8393
+Curry County,1,51,Oregon,42.4764,-124.2731,0.6067
+Custer County,11,224,Idaho,44.5492,-113.8523,0.3713
+Daggett County,6,39,Utah,40.7979,-108.9242,0.1849
+Dakota County,1,2,Minnesota,44.8349,-93.2431,0.1492
+Daniels County,2,10,Montana,48.429028,-105.6455,0.1228
+Davis County,2,13,Utah,41.074667,-111.891833,0.0678
+Davison County,1,1,South Dakota,43.87373,-97.93138,0.3742
+Dawes County,2,27,Nebraska,42.683155,-102.984481,0.3156
+Dawson County,2,19,Montana,47.16194,-104.7059,0.0764
+Day County,1,4,South Dakota,45.473436,-97.255317,0.1282
+De Baca County,1,16,New Mexico,34.44517,-104.4957,0.5043
+De Soto Parish,1,1,Louisiana,32.079038,-94.056821,0.8101
+Deaf Smith County,1,1,Texas,34.895881,-102.103892,0.7245
+Deer Lodge County,3,61,Montana,46.1906,-113.1422,0.6417
+Del Norte County,4,65,California,42.082833,-124.03255,0.9004
+Delaware County,2,38,Oklahoma,36.315278,-94.761389,0.7878
+Delta County,4,47,Colorado,39.13131,-107.912929,0.581
+Dent County,1,17,Missouri,37.631,-91.293,0.6551
+Deschutes County,8,768,Oregon,44.29052,-121.5796,0.2634
+Deuel County,1,2,South Dakota,44.897267,-96.710048,0.0213
+Dewey County,1,5,South Dakota,45.499611,-101.4971,0.8263
+Dickens County,1,1,Texas,33.679323,-100.841248,0.7588
+Dickey County,1,1,North Dakota,46.008511,-98.115746,0.146
+Dickinson County,1,2,Iowa,43.40566131294253,-95.192278368441,0.055
+Divide County,1,2,North Dakota,48.850911,-103.486968,0.2768
+Dolores County,4,144,Colorado,37.7789,-108.7915,0.1858
+Donley County,1,3,Texas,35.214667,-100.9695,0.3353
+Douglas County,13,378,Oregon,42.9238,-122.9498,0.6487
+Doña Ana County,2,9,New Mexico,32.423167,-106.569333,0.9873
+Duchesne County,3,164,Utah,40.2803,-109.9825,0.5361
+Dunn County,1,9,North Dakota,47.555572,-102.663337,0.4104
+Duval County,1,3,Texas,27.743959593076468,-98.2345292088885,0.9768
+Eagle County,2,91,Colorado,39.6777,-106.3992,0.3497
+Eastland County,1,6,Texas,32.444083,-98.9742,0.8616
+Eddy County,4,98,New Mexico,32.441622,-104.487368,0.6382
+Edmunds County,1,2,South Dakota,45.55983,-99.03593,0.0258
+El Dorado County,1,111,California,38.635451,-120.508292,0.1896
+El Paso County,3,28,Colorado,39.08975,-104.8964,0.4604
+Elbert County,1,4,Colorado,39.158473,-104.388035,0.0006
+Elko County,2,274,Nevada,40.695222,-115.474639,0.6185
+Elmore County,3,160,Idaho,41.95179458,-116.15999772,0.8155
+Emery County,2,42,Utah,38.9026,-111.2717,0.2269
+Erath County,2,2,Texas,32.356269,-98.248026,0.7996
+Esmeralda County,1,6,Nevada,38.1902,-116.828117,0.9077
+Eureka County,3,68,Nevada,39.53304,-117.0256,0.4254
+Fall River County,2,24,South Dakota,43.32355,-104.069667,0.6277
+Fallon County,2,5,Montana,46.06296,-104.525,0.1508
+Falls County,1,1,Texas,31.355556,-97.079444,0.972
+Fannin County,2,12,Texas,33.787899,-95.900726,0.643
+Faribault County,1,1,Minnesota,43.726098,-94.102233,0.1629
+Faulk County,1,2,South Dakota,45.00576,-98.92449,0.3627
+Fayette County,1,2,Texas,29.810567,-97.013433,0.5234
+Fergus County,2,39,Montana,47.44789,-109.56663,0.3837
+Ferry County,1,292,Washington,48.6204,-118.1081,0.7159
+Fillmore County,2,4,Nebraska,40.60046,-97.73059,0.0083
+Flathead County,3,277,Montana,48.3137,-114.4256,0.2094
+Fort Bend County,1,1,Texas,29.803839,-95.626016,0.4515
+Foster County,1,5,North Dakota,47.218505,-98.858306,0.0127
+Franklin County,8,74,Washington,46.1715,-118.9588,0.9147
+Freestone County,1,2,Texas,31.638874,-96.322942,0.8088
+Fremont County,10,261,Wyoming,43.1004,-108.3833,0.7642
+Fresno County,2,31,California,37.050817,-119.392963,0.9618
+Gallatin County,5,58,Montana,45.53093,-111.135,0.0783
+Garfield County,10,263,Montana,47.00394,-106.544,0.0652
+Garland County,1,8,Arkansas,34.628406,-93.125522,0.8661
+Garvin County,2,32,Oklahoma,34.635,-97.2475,0.546
+Gem County,2,31,Idaho,43.8396,-116.6142,0.6153
+Gila County,5,887,Arizona,34.09579,-110.7393,0.847
+Gillespie County,1,3,Texas,30.297467,-98.829105,0.6392
+Gilliam County,3,9,Oregon,45.5722,-120.3936,0.5282
+Gilpin County,2,51,Colorado,39.9818343072007,-105.7116131033431,0.0967
+Glacier County,4,143,Montana,48.8030556,-112.8494444,0.9752
+Glenn County,1,39,California,39.5944,-122.5286,0.8622
+Golden Valley County,4,17,Montana,46.1184,-108.906,0.1451
+Goliad County,1,1,Texas,28.67991,-97.359141,0.5243
+Gonzales County,1,2,Texas,29.758761,-97.280477,0.9087
+Goodhue County,1,1,Minnesota,44.50667245656055,-92.5600232452375,0.1645
+Gooding County,2,61,Idaho,42.55642,-115.2786,0.8059
+Goshen County,2,8,Wyoming,42.072314,-104.187474,0.2918
+Grady County,1,2,Oklahoma,34.893333,-97.87,0.434
+Graham County,5,413,Arizona,33.078056,-109.88,0.8486
+Grand County,8,203,Colorado,40.154367,-106.417883,0.1565
+Grand Forks County,1,1,North Dakota,47.97878,-97.395601,0.3198
+Granite County,3,135,Montana,46.91689,-113.4345,0.2246
+Grant County,12,538,Oregon,44.3906,-119.0427,0.5784
+Gray County,1,1,Texas,35.505,-100.878,0.8645
+Grays Harbor County,2,103,Washington,47.1054,-123.4481,0.8215
+Grayson County,1,3,Texas,33.757069,-96.807464,0.6888
+Greenlee County,5,199,Arizona,33.5482,-109.387383,0.3598
+Gregg County,1,12,Texas,32.469709,-94.748238,0.8731
+Grimes County,2,16,Texas,30.5775,-95.856667,0.8676
+Guadalupe County,2,11,New Mexico,34.158806,-105.156722,0.8791
+Gunnison County,3,24,Colorado,38.534217,-107.157783,0.1222
+Hale County,1,1,Texas,34.18139219719309,-101.72862891519762,0.9332
+Hall County,1,2,Texas,34.818954,-100.593297,0.8689
+Hamilton County,2,3,Nebraska,40.793,-97.921,0.0229
+Hamlin County,1,1,South Dakota,44.51274,-97.08023,0.1336
+Hand County,1,1,South Dakota,44.576,-98.728,0.048
+Hansford County,1,1,Texas,36.0043,-101.4612,0.4836
+Hardin County,1,7,Texas,30.335833,-94.336944,0.6465
+Harding County,4,10,New Mexico,36.480446,-103.912881,0.6615
+Harney County,5,168,Oregon,43.6066,-119.2265,0.8034
+Harris County,1,2,Texas,30.003065,-95.508501,0.9201
+Harrison County,1,20,Texas,32.6557,-94.1101,0.9036
+Haskell County,2,15,Oklahoma,35.183333,-95.35,0.8387
+Hawaii County,1,7,Hawaii,19.40459161319086,-155.29439440616,0.636
+Hays County,1,3,Texas,30.095601,-97.83318,0.6723
+Henderson County,1,3,Texas,32.344758,-95.801476,0.8291
+Hettinger County,1,1,North Dakota,46.38866,-102.54945,0.1495
+Hidalgo County,6,93,New Mexico,31.453333,-109.042167,0.9179
+Hill County,2,33,Montana,48.26440084,-109.75121032,0.4419
+Hinsdale County,1,9,Colorado,38.312967,-107.1033,0.0869
+Hockley County,1,1,Texas,33.593017,-102.49785,0.93
+Honolulu County,1,2,Hawaii,21.384,-157.983833,0.5708
+Hood County,1,2,Texas,32.395493,-97.661167,0.525
+Hood River County,7,238,Oregon,46.0053,-121.4901,0.7111
+Hopkins County,1,3,Texas,33.150791,-95.653138,0.7525
+Hot Springs County,4,30,Wyoming,43.6485,-107.999667,0.1938
+Houston County,1,34,Texas,31.4828,-95.165967,0.9625
+Howard County,1,2,Texas,32.301609,-101.31112,0.8816
+Howell County,1,12,Missouri,36.91475,-92.185,0.7693
+Hubbard County,1,22,Minnesota,46.936379,-94.934583,0.2809
+Hudspeth County,2,2,Texas,32.153633,-105.36655,0.9943
+Huerfano County,2,7,Colorado,37.399783,-104.996417,0.5383
+Hughes County,3,37,Oklahoma,35.246389,-96.273056,0.7945
+Humboldt County,4,214,Nevada,41.029903,-117.762379,0.616
+Hunt County,1,6,Texas,33.165,-96.009667,0.8746
+Hutchinson County,1,24,Texas,35.733889,-101.523333,0.3245
+Idaho County,4,313,Idaho,45.47803,-116.3753,0.5199
+Imperial County,2,9,California,33.510132161194775,-115.82776529893096,0.9936
+Inyo County,2,16,California,36.872571,-118.173049,0.6147
+Iowa County,1,2,Iowa,41.818228,-92.136945,0.0484
+Iron County,4,221,Utah,37.39605,-113.228261,0.4114
+Isanti County,1,41,Minnesota,45.499068,-93.440057,0.0913
+Island County,1,73,Washington,48.40657,-122.5534,0.3032
+Itasca County,1,46,Minnesota,47.40151,-93.811237,0.4012
+Jack County,2,3,Texas,33.2679,-98.298983,0.9418
+Jackson County,17,341,Oregon,42.9968,-122.3853,0.7025
+Jasper County,1,23,Texas,31.041533,-93.97745,0.8737
+Jeff Davis County,1,2,Texas,30.614167,-104.152333,0.4738
+Jefferson County,17,363,Oregon,44.3638,-121.1975,0.9278
+Jerauld County,1,1,South Dakota,44.35328,-98.509084,0.1976
+Jerome County,2,8,Idaho,42.624164,-114.210606,0.5826
+Jim Wells County,1,4,Texas,27.730279,-98.055454,0.9491
+Johnson County,5,146,Wyoming,43.70786,-106.5527,0.1709
+Johnston County,1,13,Oklahoma,34.350178,-96.713994,0.875
+Jones County,2,10,Texas,32.705533,-99.6819,0.5829
+Josephine County,5,145,Oregon,42.81305,-123.318467,0.7817
+Juab County,3,101,Utah,39.7594,-112.28763,0.0659
+Judith Basin County,3,33,Montana,47.235833,-110.400833,0.049
+Kanabec County,1,30,Minnesota,45.708817,-93.384175,0.2612
+Kandiyohi County,1,5,Minnesota,45.158063,-95.077206,0.5383
+Kane County,3,268,Utah,37.34175,-112.614467,0.259
+Karnes County,1,1,Texas,28.889807,-97.606765,0.9367
+Kay County,2,9,Oklahoma,36.730833,-96.720278,0.8549
+Kearney County,1,2,Nebraska,40.3982,-98.7808,0.1028
+Kenedy County,1,3,Texas,27.069731,-97.381439,0.6678
+Kent County,2,2,Texas,33.411667,-100.501033,0.2393
+Kern County,2,72,California,35.754128,-118.424931,0.9685
+Kerr County,1,2,Texas,29.890503,-99.105375,0.7442
+Keya Paha County,1,2,Nebraska,43.031033,-99.919833,0.0226
+Kidder County,1,2,North Dakota,47.052706,-99.565678,0.0321
+Kimball County,2,2,Nebraska,41.05939,-104.09378,0.4308
+Kimble County,2,2,Texas,30.385417,-99.669217,0.4948
+King County,3,61,Washington,47.2747,-121.7882,0.3761
+Kingfisher County,1,1,Oklahoma,35.856944,-97.685,0.398
+Kings County,1,4,California,35.66181854174279,-120.06430025162362,0.9507
+Kingsbury County,1,1,South Dakota,44.660953,-97.438386,0.1114
+Kiowa County,1,1,Oklahoma,34.756666,-98.783392,0.741
+Kitsap County,1,25,Washington,47.544,-122.8989,0.3334
+Kittitas County,4,319,Washington,47.187,-120.896,0.3366
+Kittson County,1,14,Minnesota,48.970345,-96.985551,0.0958
+Klamath County,5,555,Oregon,42.8694,-122.1572,0.8438
+Kleberg County,1,4,Texas,27.44209,-97.83251,0.9924
+Klickitat County,4,105,Washington,45.9259,-121.0048,0.6414
+Koochiching County,1,23,Minnesota,48.558,-93.085667,0.3118
+Kootenai County,3,90,Idaho,47.639878,-117.06368,0.2746
+La Paz County,4,106,Arizona,34.48395,-113.3615,0.9195
+La Plata County,4,213,Colorado,37.2667,-108.0005,0.258
+La Salle County,1,1,Texas,28.442051,-99.234682,0.9128
+Lac qui Parle County,1,1,Minnesota,44.8758,-96.0542,0.0535
+Laclede County,1,2,Missouri,37.633037,-92.64976,0.7327
+Lake County,14,579,Montana,47.27277778,-114.18111111,0.7541
+Lake of the Woods County,1,12,Minnesota,48.581483,-94.560283,0.0417
+Lamar County,1,6,Texas,33.642233,-95.338733,0.8536
+Lamb County,1,1,Texas,34.085967,-102.111786,0.8221
+Lampasas County,1,2,Texas,31.200274,-98.238452,0.658
+Lander County,2,90,Nevada,40.64157,-116.32818,0.5762
+Lane County,4,342,Oregon,43.6358,-122.7347,0.7375
+Laramie County,2,19,Wyoming,41.092215,-104.835984,0.2514
+Larimer County,2,64,Colorado,40.57,-105.4305,0.1524
+Las Animas County,3,14,Colorado,37.25172,-104.69304,0.9068
+Lassen County,3,68,California,40.422532,-120.701453,0.8231
+Latah County,2,44,Idaho,46.6037,-116.599083,0.2825
+Latimer County,1,30,Oklahoma,34.815278,-95.03,0.8396
+Lavaca County,1,1,Texas,29.327932,-97.21577,0.5752
+Lawrence County,3,40,South Dakota,44.51118,-104.1203,0.3449
+Le Flore County,2,22,Oklahoma,34.777883,-94.739783,0.924
+Le Sueur County,1,1,Minnesota,44.423332,-93.761277,0.0694
+Lea County,1,6,New Mexico,32.5685,-103.6815,0.9399
+Leavenworth County,1,1,Kansas,39.287,-94.966,0.2475
+Lee County,1,5,Texas,30.469357,-97.251151,0.7856
+Lemhi County,6,185,Idaho,45.0608,-114.033,0.4073
+Leon County,1,3,Texas,31.351808,-96.213469,0.6974
+Lewis County,3,199,Washington,46.80765,-123.1174,0.7028
+Lewis and Clark County,4,206,Montana,46.7539,-112.4027,0.1906
+Liberty County,4,23,Montana,48.83999,-111.1372,0.6592
+Limestone County,1,6,Texas,31.68563,-96.80029,0.9065
+Lincoln County,23,822,Washington,47.911531,-118.127317,0.2113
+Linn County,3,100,Oregon,44.688142,-122.751231,0.6586
+Little River County,1,1,Arkansas,33.614296,-94.616277,0.4197
+Live Oak County,1,1,Texas,28.595,-98.012,0.9039
+Llano County,1,4,Texas,30.803969,-98.605346,0.6192
+Logan County,4,33,Colorado,40.622982,-103.200126,0.6004
+Los Alamos County,2,155,New Mexico,35.880828,-106.695894,0.0099
+Los Angeles County,2,37,California,34.602772,-118.38755,0.8629
+Loup County,1,1,Nebraska,41.575846,-99.353714,0.202
+Love County,1,11,Oklahoma,33.894522,-97.134732,0.7961
+Loving County,1,6,Texas,32.260967,-103.753383,0.4356
+Lubbock County,1,3,Texas,33.558793,-101.801005,0.8422
+Luna County,2,9,New Mexico,32.055767,-107.6586,0.9997
+Lyman County,1,5,South Dakota,44.235929,-99.863999,0.867
+Lyon County,3,7,Kansas,38.405,-96.014,0.7222
+Madera County,1,16,California,37.235648,-119.554156,0.9593
+Madison County,8,96,Montana,45.73561,-111.8096,0.098
+Mahnomen County,1,44,Minnesota,47.486767,-95.978633,0.9577
+Major County,1,1,Oklahoma,36.118806,-98.559861,0.3579
+Malheur County,3,58,Oregon,43.784283,-117.764633,0.9908
+Maricopa County,3,330,Arizona,33.961369,-111.710716,0.713
+Marin County,1,58,California,37.929998,-122.677377,0.37
+Marion County,5,42,Oregon,44.88622,-122.61731,0.902
+Mariposa County,1,84,California,37.795551,-119.91023,0.8613
+Marshall County,4,23,Oklahoma,34.071667,-96.661667,0.8769
+Mason County,3,194,Washington,47.1421,-123.0599,0.573
+Matagorda County,1,9,Texas,28.911871,-95.576395,0.9758
+Mayes County,2,5,Oklahoma,36.285333,-95.199833,0.7499
+McClain County,1,3,Oklahoma,34.902112,-97.608265,0.2991
+McCone County,2,23,Montana,48.050694,-105.968361,0.0121
+McCook County,1,2,South Dakota,43.616581,-97.168718,0.0366
+McCurtain County,3,16,Oklahoma,34.078417,-94.63625,0.8976
+McHenry County,1,1,North Dakota,48.290345,-100.636742,0.0907
+McIntosh County,3,11,Oklahoma,35.2625,-95.904444,0.7528
+McKenzie County,1,12,North Dakota,47.61265,-103.273442,0.468
+McKinley County,2,103,New Mexico,35.069222,-108.828806,0.9695
+McLean County,1,6,North Dakota,47.349836,-101.383733,0.0662
+McLeod County,1,1,Minnesota,44.80245,-94.292906,0.1126
+McMullen County,1,1,Texas,28.10211594887923,-98.84123607419762,0.8104
+McPherson County,2,3,South Dakota,45.65,-99.186,0.1788
+Meade County,1,21,South Dakota,44.163583,-103.456083,0.1744
+Meagher County,3,53,Montana,46.7646,-110.7559,0.0188
+Medina County,1,1,Texas,29.3115,-99.1205,0.741
+Meeker County,1,7,Minnesota,44.8617,-94.600542,0.1018
+Mellette County,1,3,South Dakota,43.563333,-101.203889,0.8552
+Mendocino County,2,218,California,38.984555,-123.69034,0.9726
+Merced County,2,26,California,37.068,-120.772,0.973
+Mercer County,1,3,North Dakota,47.612775,-101.836667,0.3296
+Mesa County,6,293,Colorado,39.34275,-108.19345,0.6462
+Milam County,2,6,Texas,30.8598,-97.076107,0.798
+Millard County,2,125,Utah,39.377232,-112.364472,0.4502
+Mille Lacs County,1,23,Minnesota,45.761887,-93.553278,0.5406
+Miller County,2,5,Arkansas,33.26135,-94.062667,0.9354
+Mineral County,9,248,Montana,47.3044,-115.1084,0.2218
+Minidoka County,2,6,Idaho,42.68751,-113.9214,0.5978
+Minnehaha County,1,2,South Dakota,43.69111,-96.51398,0.3748
+Missoula County,3,302,Montana,47.2142,-113.5189,0.2762
+Modoc County,5,67,California,42.04238,-120.9508,0.8186
+Moffat County,5,83,Colorado,40.992,-107.8012,0.8164
+Mohave County,5,356,Arizona,35.1154,-114.6352,0.8489
+Mono County,3,23,California,37.632237,-118.936751,0.3891
+Montague County,3,7,Texas,33.5077,-97.953498,0.5959
+Monterey County,1,85,California,36.243893,-121.774151,0.8686
+Montezuma County,4,158,Colorado,37.3031,-108.764717,0.6061
+Montgomery County,2,40,Texas,30.216887,-95.330625,0.5212
+Montrose County,3,46,Colorado,38.5304,-108.4453,0.5164
+Moody County,1,3,South Dakota,44.095067,-96.849633,0.2431
+Moore County,1,3,Texas,35.741216,-102.021173,0.882
+Mora County,2,19,New Mexico,36.1099,-105.23095,0.6169
+Morgan County,3,50,Utah,41.030883,-111.529533,0.0
+Morrill County,1,1,Nebraska,41.646389,-103.381111,0.3143
+Morris County,1,22,Texas,32.95762,-94.63274,0.7792
+Morrison County,1,26,Minnesota,45.983723,-94.338913,0.1448
+Morrow County,4,22,Oregon,45.834,-119.7429,0.7735
+Morton County,1,1,Kansas,37.101912,-102.096887,0.3077
+Motley County,1,2,Texas,34.070992,-100.987058,0.1721
+Mountrail County,1,20,North Dakota,47.969722,-102.320833,0.7156
+Mower County,1,1,Minnesota,43.818666,-93.111212,0.5021
+Multnomah County,3,8,Oregon,45.54395,-122.372117,0.5927
+Murray County,1,20,Oklahoma,34.59171,-96.99228,0.5775
+Musselshell County,2,37,Montana,46.7431,-108.7765,0.2278
+Nacogdoches County,1,19,Texas,31.809783,-94.63025,0.9952
+Napa County,1,50,California,38.367222,-122.501944,0.6831
+Natrona County,3,118,Wyoming,42.765693,-106.526497,0.3987
+Navajo County,3,369,Arizona,34.163967,-109.824467,0.9806
+Navarro County,2,2,Texas,32.35465,-96.35055,0.979
+Nelson County,1,6,North Dakota,48.03366,-98.28827,0.0468
+Nevada County,2,158,California,39.10025,-120.94206,0.2148
+Newton County,2,39,Texas,30.701533,-93.7993,0.8463
+Nez Perce County,3,72,Idaho,46.2749,-116.8151,0.5892
+Niobrara County,1,19,Wyoming,42.964197,-104.385106,0.419
+Nolan County,1,2,Texas,32.306233,-100.143517,0.9815
+Norman County,1,4,Minnesota,47.073,-96.373,0.2806
+Nueces County,1,8,Texas,27.426925,-97.325347,0.9351
+Nye County,2,49,Nevada,36.10467,-115.8077,0.7954
+Ochiltree County,1,1,Texas,36.046078,-100.868322,0.8244
+Oglala Lakota County,2,68,South Dakota,43.392074,-102.306221,0.9545
+Okanogan County,3,338,Washington,48.7196,-119.4383,0.9453
+Okfuskee County,2,43,Oklahoma,35.428889,-96.176389,0.8715
+Oklahoma County,1,1,Oklahoma,35.434234,-97.407938,0.8431
+Okmulgee County,2,18,Oklahoma,35.274167,-96.030556,0.922
+Oldham County,1,2,Texas,35.503333,-102.2525,0.392
+Oliver County,1,1,North Dakota,46.848674,-101.274296,0.0808
+Oneida County,4,47,Idaho,41.8578,-112.4364,0.0792
+Orange County,4,48,California,33.76709,-117.582217,0.5692
+Oregon County,1,6,Missouri,36.709833,-91.25875,0.6589
+Osage County,2,81,Oklahoma,36.429636,-96.269011,0.6207
+Otero County,4,104,New Mexico,33.015694,-105.701389,0.9294
+Ottawa County,3,55,Oklahoma,36.9141,-94.65728,0.9252
+Otter Tail County,1,9,Minnesota,46.2533,-96.0701,0.3303
+Ouray County,2,15,Colorado,38.239283,-107.5383,0.0834
+Owyhee County,5,124,Idaho,43.4141,-116.7737,0.7432
+Ozark County,1,3,Missouri,36.648,-92.630583,0.5632
+Pacific County,1,24,Washington,46.3115,-124.0579,0.7038
+Palo Pinto County,2,12,Texas,32.939167,-98.3015,0.8015
+Panola County,1,14,Texas,31.92865,-94.499767,0.7331
+Park County,8,183,Wyoming,44.518403,-108.969917,0.1072
+Parker County,1,2,Texas,32.630315,-97.697317,0.2638
+Pawnee County,2,33,Oklahoma,36.333442,-96.390258,0.4979
+Payette County,2,22,Idaho,43.8325,-116.8881,0.6713
+Payne County,1,1,Oklahoma,36.110067,-97.190267,0.6408
+Pembina County,1,2,North Dakota,48.934164,-97.905909,0.1206
+Pend Oreille County,3,209,Washington,48.13483,-117.2241,0.4314
+Pennington County,2,40,South Dakota,44.078333,-103.273889,0.5539
+Perry County,1,1,Arkansas,34.77572,-92.836023,0.4292
+Pershing County,1,31,Nevada,40.2203,-118.4296,0.6761
+Petroleum County,4,47,Montana,47.112883,-108.551783,0.0013
+Phelps County,2,3,Missouri,37.822896,-91.895828,0.6402
+Phillips County,3,16,Montana,47.949722,-108.138056,0.2081
+Pierce County,3,145,Washington,47.075,-122.1966,0.5434
+Pike County,1,2,Arkansas,34.322222,-93.898611,0.5972
+Pima County,3,200,Arizona,32.32635,-110.7036,0.888
+Pinal County,3,333,Arizona,32.99875,-111.749307,0.797
+Pine County,1,43,Minnesota,45.996157,-92.820139,0.4919
+Pitkin County,3,21,Colorado,39.087917,-107.177833,0.0617
+Pittsburg County,2,33,Oklahoma,35.018611,-95.807222,0.868
+Piute County,3,50,Utah,38.4311,-112.0755,0.5402
+Placer County,1,20,California,38.856162,-120.99328,0.1992
+Platte County,2,31,Wyoming,41.665147,-104.838963,0.3309
+Plumas County,4,74,California,39.98022,-120.9519,0.4088
+Polk County,7,78,Oregon,44.827778,-123.5825,0.6395
+Pondera County,2,17,Montana,48.631389,-112.338889,0.7967
+Pontotoc County,3,67,Oklahoma,34.825027,-96.424389,0.6561
+Pope County,2,5,Arkansas,35.603875,-92.944422,0.8171
+Pottawatomie County,1,4,Oklahoma,35.330278,-96.761389,0.7496
+Potter County,2,10,Texas,35.518642,-101.819096,0.9889
+Powder River County,4,156,Montana,45.4158,-106.0844,0.1521
+Powell County,3,110,Montana,46.8108,-112.7995,0.2319
+Power County,2,19,Idaho,42.671783,-112.835567,0.762
+Prairie County,2,37,Montana,46.45302,-105.3194,0.3567
+Presidio County,1,16,Texas,29.02954,-103.32913,0.9933
+Pueblo County,2,11,Colorado,38.308611,-104.643889,0.8533
+Pulaski County,1,8,Missouri,37.519972,-92.306611,0.6927
+Pushmataha County,2,5,Oklahoma,34.264167,-95.492778,0.8896
+Quay County,2,5,New Mexico,35.404405,-103.053997,0.8711
+Rains County,1,1,Texas,33.011933,-95.869167,0.4706
+Ramsey County,2,50,Minnesota,44.95583,-93.08472,0.7076
+Randall County,1,5,Texas,35.039133,-101.841183,0.3519
+Ransom County,1,3,North Dakota,46.5087,-97.435,0.0935
+Ravalli County,6,410,Montana,45.9227,-114.1478,0.1511
+Reagan County,1,1,Texas,31.180833,-101.440556,0.5052
+Real County,1,2,Texas,29.858224,-99.752513,0.783
+Red Lake County,1,6,Minnesota,47.662,-96.091,0.0891
+Red River County,1,11,Texas,33.835987,-95.170791,0.6895
+Redwood County,1,1,Minnesota,44.611246,-95.140747,0.1794
+Refugio County,2,4,Texas,28.343,-97.225333,0.9653
+Renville County,2,4,North Dakota,48.615,-101.639,0.0245
+Reynolds County,1,11,Missouri,37.4617,-91.07955,0.6354
+Rich County,4,37,Utah,41.95575,-111.499,0.2141
+Richland County,4,7,Montana,48.116944,-104.172222,0.2644
+Rio Arriba County,2,128,New Mexico,36.016167,-106.067,0.763
+Rio Blanco County,2,195,Colorado,40.6171,-108.6733,0.5167
+Rio Grande County,2,13,Colorado,37.911333,-106.410667,0.7868
+Ripley County,1,5,Missouri,36.6463,-90.780383,0.476
+Riverside County,2,70,California,33.342443,-116.898263,0.8199
+Roberts County,2,3,South Dakota,45.9482,-97.0927,0.6694
+Robertson County,2,2,Texas,30.980752,-96.760553,0.8546
+Roger Mills County,1,13,Oklahoma,35.6174,-99.7002,0.2835
+Rolette County,1,45,North Dakota,48.858333,-99.8975,0.8934
+Roosevelt County,6,124,New Mexico,33.780686,-103.83572,0.951
+Roseau County,1,21,Minnesota,48.295353,-95.552734,0.2504
+Rosebud County,3,135,Montana,45.3328,-106.3892,0.9408
+Routt County,3,53,Colorado,40.293988,-106.489406,0.1314
+Rusk County,1,43,Texas,31.910383,-94.788483,0.7973
+Sabine County,2,40,Texas,31.10035,-93.955517,0.5609
+Sabine Parish,1,1,Louisiana,31.69245,-93.8392,0.8848
+Sacramento County,2,31,California,38.520694,-121.403502,0.7509
+Saguache County,2,8,Colorado,38.083967,-106.372617,0.6608
+Salt Lake County,2,54,Utah,40.771067,-112.098217,0.4512
+San Augustine County,1,40,Texas,31.4623,-94.20005,0.9885
+San Benito County,3,25,California,36.639035,-121.234374,0.5094
+San Bernardino County,2,55,California,34.236246,-117.145139,0.8858
+San Diego County,2,97,California,33.301278,-116.837996,0.7057
+San Francisco County,2,3,California,37.866044,-122.428347,0.482
+San Jacinto County,2,19,Texas,30.4258,-95.1486,0.8091
+San Joaquin County,3,29,California,37.643341,-121.496208,0.8718
+San Juan County,9,325,New Mexico,36.707767,-107.895996,0.9669
+San Luis Obispo County,2,81,California,35.883257,-120.456805,0.5227
+San Mateo County,1,13,California,37.39743,-122.22467,0.2899
+San Miguel County,5,62,New Mexico,35.4686667,-104.9,0.9854
+San Patricio County,1,3,Texas,28.05488,-97.48632,0.9249
+San Saba County,1,5,Texas,30.99182,-98.924467,0.6389
+Sanders County,4,186,Montana,47.3541,-115.1283,0.5778
+Sandoval County,3,64,New Mexico,35.31276,-106.5409,0.3933
+Sanpete County,2,78,Utah,39.15434,-111.77498,0.5116
+Santa Barbara County,1,27,California,34.501186,-119.724869,0.8667
+Santa Clara County,1,23,California,37.180996,-122.221556,0.3614
+Santa Cruz County,5,190,Arizona,31.439992,-111.415873,0.9383
+Santa Fe County,3,67,New Mexico,35.788533,-105.85755,0.7633
+Sargent County,1,2,North Dakota,46.386702,-97.274826,0.0251
+Scott County,1,22,Arkansas,34.85698,-94.326088,0.7537
+Scotts Bluff County,1,1,Nebraska,41.92876,-103.7939,0.7356
+Searcy County,1,13,Arkansas,35.714619,-92.902528,0.517
+Sedgwick County,2,2,Colorado,40.926054,-102.383127,0.6729
+Seminole County,2,98,Oklahoma,35.131944,-96.759444,0.9523
+Sequoyah County,2,18,Oklahoma,35.6325,-94.689167,0.8183
+Sevier County,2,91,Utah,38.75735,-112.47588,0.2886
+Shackelford County,1,7,Texas,32.696867,-99.26205,0.3936
+Shannon County,1,12,Missouri,37.276468,-91.407544,0.4429
+Shasta County,2,162,California,40.715682,-122.418399,0.7649
+Shelby County,1,10,Texas,31.75445,-94.0107,0.8778
+Sherburne County,1,30,Minnesota,45.464602,-93.555814,0.1047
+Sheridan County,7,95,Montana,48.3724,-104.5727,0.1642
+Sherman County,3,53,Oregon,45.934864,-120.692474,0.3376
+Shoshone County,5,154,Idaho,47.587,-115.913,0.7493
+Sibley County,1,1,Minnesota,44.6344,-94.2358,0.1139
+Sierra County,4,91,New Mexico,33.5519,-107.3735,0.7677
+Silver Bow County,3,88,Montana,46.2689,-112.3941,0.4534
+Sioux County,2,25,Nebraska,42.8288,-103.6012,0.3204
+Siskiyou County,3,150,California,41.8974,-122.7834,0.7884
+Skagit County,1,147,Washington,48.5398,-121.8855,0.5982
+Skamania County,6,157,Washington,46.4638,-121.9017,0.2345
+Slope County,1,1,North Dakota,46.562867,-103.598883,0.0134
+Smith County,1,9,Texas,32.076511,-95.516998,0.8234
+Snohomish County,1,172,Washington,48.3327,-121.4426,0.3557
+Socorro County,2,91,New Mexico,33.9139,-107.568,0.8972
+Solano County,1,18,California,38.426557,-122.034679,0.6201
+Somervell County,1,1,Texas,32.3036,-97.818,0.5135
+Sonoma County,2,108,California,38.348133,-122.556515,0.5562
+Spink County,1,1,South Dakota,44.798856,-98.084275,0.1381
+Spokane County,1,207,Washington,47.6789,-117.2289,0.5638
+St. Louis City,1,1,Missouri,38.629167,-90.183056,0.8139
+St. Louis County,1,51,Minnesota,47.767033,-92.461083,0.3054
+Stafford County,1,2,Kansas,38.135833,-98.475833,0.2272
+Stanislaus County,2,5,California,37.538234288073795,-121.27026903575032,0.8511
+Stanley County,1,12,South Dakota,44.154883,-100.414967,0.0452
+Stark County,1,1,North Dakota,46.88914,-102.26116,0.3112
+Starr County,2,7,Texas,26.2425,-98.642778,0.9905
+Stearns County,1,1,Minnesota,45.44826,-94.548726,0.4572
+Steele County,1,1,North Dakota,47.6,-97.6543,0.0299
+Stephens County,2,14,Texas,32.73575,-98.5703,0.9898
+Stevens County,3,425,Washington,47.96432,-117.7775,0.4652
+Stillwater County,2,17,Montana,45.4827,-109.4616,0.0608
+Stone County,2,19,Arkansas,36.047556,-92.334111,0.7709
+Stonewall County,1,4,Texas,33.056767,-100.122533,0.2994
+Sublette County,2,63,Wyoming,42.864825,-109.864197,0.1225
+Sully County,1,1,South Dakota,44.927167,-100.601417,0.027
+Summit County,4,111,Utah,40.7352,-111.6101,0.0509
+Sweet Grass County,4,22,Montana,45.2177,-109.7698,0.0242
+Sweetwater County,3,89,Wyoming,41.52962,-109.4841,0.4722
+Swift County,1,1,Minnesota,45.3096,-95.3117,0.5119
+Swisher County,1,1,Texas,34.377778,-101.55,0.9103
+Tama County,1,2,Iowa,41.999591,-92.643453,0.4384
+Taney County,1,8,Missouri,36.837807,-93.000533,0.7941
+Taos County,2,76,New Mexico,36.730633,-105.551033,0.6955
+Taylor County,1,2,Texas,32.51784,-99.89025,0.7591
+Tehama County,1,86,California,40.220481,-122.283595,0.9271
+Teller County,3,107,Colorado,38.89605,-105.399,0.0496
+Terrell County,1,6,Texas,29.145136,-103.013203,0.0859
+Terry County,1,1,Texas,33.18081,-102.15305,0.9828
+Teton County,8,184,Montana,47.4811,-112.8704,0.3662
+Texas County,2,14,Oklahoma,36.627081,-101.217061,0.9084
+Thomas County,1,6,Nebraska,41.891333,-100.29995,0.0019
+Throckmorton County,1,6,Texas,33.05906,-99.23346,0.1581
+Thurston County,3,127,Washington,47.0375,-122.897778,0.3939
+Tillamook County,3,13,Oregon,45.66017,-123.44467,0.6507
+Tillman County,2,5,Oklahoma,34.0635,-98.936167,0.9125
+Titus County,1,5,Texas,33.090324,-94.897422,0.8995
+Todd County,2,42,South Dakota,43.237118,-100.856804,0.9475
+Tom Green County,1,2,Texas,31.46344,-100.35369,0.8113
+Tooele County,2,170,Utah,40.156944,-112.36475,0.1766
+Toole County,1,3,Montana,48.994167,-112.265278,0.6023
+Torrance County,3,58,New Mexico,34.533333,-106.2215,0.7712
+Towner County,1,1,North Dakota,48.670829,-98.839321,0.2297
+Traill County,1,1,North Dakota,47.217279,-97.409119,0.0697
+Travis County,1,3,Texas,30.264746663316785,-97.64137322300203,0.5702
+Treasure County,2,24,Montana,45.9087,-107.3382,0.0719
+Trinity County,5,147,California,40.4653,-123.1922,0.7206
+Tulare County,1,61,California,36.50222,-119.25639,0.9147
+Tuolumne County,1,132,California,38.270428,-120.316439,0.6319
+Twin Falls County,3,84,Idaho,42.19467,-114.2857,0.5756
+Tyler County,1,24,Texas,30.9736,-94.53985,0.9319
+Uinta County,4,44,Wyoming,41.331321,-110.346358,0.2803
+Uintah County,4,133,Utah,40.1614,-109.61,0.5297
+Umatilla County,3,99,Oregon,46.09526,-118.8997,0.9259
+Union County,8,227,Oregon,45.2123,-118.364,0.7187
+Upshur County,1,24,Texas,32.552446,-95.137402,0.6017
+Upton County,1,2,Texas,30.885278,-101.901389,0.77
+Utah County,2,88,Utah,40.2727,-111.7381,0.2555
+Val Verde County,1,1,Texas,29.277059,-100.846231,0.9437
+Valencia County,3,101,New Mexico,34.5952,-106.7642,0.8823
+Valley County,5,256,Idaho,44.9111111,-116.0977778,0.1365
+Ventura County,1,32,California,34.599097,-118.721892,0.6249
+Victoria County,1,4,Texas,28.756667,-96.961944,0.9198
+Wabasha County,1,1,Minnesota,44.48467,-92.358627,0.0986
+Wadena County,1,23,Minnesota,46.57083,-94.90016,0.7448
+Wahkiakum County,5,40,Washington,46.19708,-123.1693,0.2039
+Walker County,2,44,Texas,30.5186,-95.6855,0.9392
+Walla Walla County,2,47,Washington,45.7585,-118.3412,0.8078
+Waller County,1,6,Texas,29.872522,-95.900147,0.8317
+Wallowa County,2,177,Oregon,45.6438,-117.6545,0.4461
+Walworth County,1,3,South Dakota,45.730336,-100.479403,0.5024
+Ward County,1,8,North Dakota,48.423139,-101.340019,0.2571
+Wasatch County,2,83,Utah,40.28337,-110.85069,0.0748
+Wasco County,3,123,Oregon,45.2128,-121.3719,0.8937
+Washakie County,4,63,Wyoming,44.05418,-107.9319,0.2192
+Washington County,20,396,Utah,37.2675,-113.6932,0.3875
+Washita County,1,2,Oklahoma,35.594072,-99.220417,0.5947
+Washoe County,3,33,Nevada,39.612374,-120.008339,0.6971
+Watonwan County,1,1,Minnesota,44.046633,-94.337367,0.6583
+Wayne County,4,69,Utah,38.0796,-111.2975,0.1053
+Weber County,2,60,Utah,41.3397,-112.098,0.3471
+Weld County,2,13,Colorado,40.6887,-104.464133,0.5889
+Weston County,4,83,Wyoming,44.02834,-104.1215,0.3331
+Wharton County,1,1,Texas,29.331017,-95.862883,0.9456
+Whatcom County,1,93,Washington,48.8454,-122.3371,0.5002
+Wheatland County,2,13,Montana,46.6299,-110.2164,0.1273
+Wheeler County,5,139,Oregon,44.5085,-120.0262,0.2479
+White Pine County,3,129,Nevada,39.053783,-114.573967,0.2498
+Whitman County,1,2,Washington,47.12285753176076,-117.74929338788866,0.5186
+Wibaux County,2,14,Montana,46.9869,-104.2409,0.273
+Wichita County,1,13,Texas,34.067199,-98.68574,0.8167
+Wilbarger County,1,1,Texas,33.95502,-99.1963,0.9561
+Wilkin County,1,8,Minnesota,46.2474,-96.22,0.1556
+Willacy County,1,3,Texas,26.514494321490503,-98.0670025659842,0.985
+Williams County,1,2,North Dakota,48.252523,-103.458802,0.5062
+Williamson County,1,1,Texas,30.755156,-97.652216,0.3207
+Wilson County,1,2,Texas,29.200773,-98.320298,0.2972
+Winnebago County,1,1,Iowa,43.244122,-93.492385,0.1403
+Winona County,1,3,Minnesota,43.899428,-91.641192,0.2377
+Wise County,1,31,Texas,33.340367,-97.627467,0.5422
+Wood County,1,8,Texas,32.826386,-95.255555,0.7655
+Woodruff County,1,1,Arkansas,35.1088,-91.2639,0.7671
+Woods County,1,6,Oklahoma,36.6902,-98.6665,0.5584
+Woodward County,1,1,Oklahoma,36.19223335960133,-99.5032569470738,0.7611
+Worth County,1,1,Iowa,43.492071,-93.280473,0.0232
+Wright County,2,9,Minnesota,45.0,-94.0,0.0235
+Yakima County,1,178,Washington,46.380278,-120.669722,0.9647
+Yamhill County,2,16,Oregon,45.28029,-123.37429,0.7232
+Yavapai County,3,229,Arizona,35.2547222,-112.1930556,0.5991
+Yell County,2,16,Arkansas,35.041694,-93.340611,0.7738
+Yellow Medicine County,1,1,Minnesota,44.666514,-95.758204,0.237
+Yellowstone County,2,132,Montana,45.81099,-108.4054,0.2889
+Yolo County,2,16,California,38.688177,-121.876058,0.7366
+York County,1,1,Nebraska,40.71672,-97.53591,0.1359
+Young County,1,1,Texas,32.851517,-98.496083,0.5345
+Yuba County,2,42,California,39.31791,-121.28264,0.9268
+Yuma County,5,66,Arizona,32.660278,-114.319722,0.9978
+Zapata County,1,2,Texas,27.021017,-99.419483,0.9968
+Ziebach County,1,4,South Dakota,44.67106477935775,-101.8679400256358,0.8842

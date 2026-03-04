@@ -440,6 +440,8 @@ with st.sidebar:
             "Impact Projection", "Coverage Analysis",
             "Zone Duration", "Fire Predictor", "Data Governance",
             "Signal Gap Analysis", "Temporal Fire Patterns",
+            "Silent Fire Tracker", "Channel Coverage",
+            "Hotspot Map (Gi*)", "County Drill-Down",
         ]
 
     if "current_page" not in st.session_state or st.session_state.current_page not in pages:
@@ -817,6 +819,22 @@ def _render_page():
     elif page == "Temporal Fire Patterns":
         from temporal_fire_pattern_page import render_temporal_fire_patterns
         render_temporal_fire_patterns()
+
+    elif page == "Silent Fire Tracker":
+        from silent_escalation_page import render_silent_escalation_page
+        render_silent_escalation_page()
+
+    elif page == "Channel Coverage":
+        from channel_coverage_page import render_channel_coverage_page
+        render_channel_coverage_page()
+
+    elif page == "Hotspot Map (Gi*)":
+        from hotspot_map_page import render_hotspot_map_page
+        render_hotspot_map_page()
+
+    elif page == "County Drill-Down":
+        from county_drilldown_page import render_county_drilldown_page
+        render_county_drilldown_page()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

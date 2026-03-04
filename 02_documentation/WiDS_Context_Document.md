@@ -223,6 +223,17 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ **Fire perimeter data quality note** — added expandable data quality expander to command_dashboard_page.py: 6,207 records, 4,139 approved, 883 rejected, 1,185 pending (33.5% not approved)
 - ✅ **Silent Fire explainer** — added "Silent Fires: The 73% Story" section to signal_gap_analysis_page.py with bar chart (46,053 silent vs 16,643 normal), metrics, and equity narrative
 - ✅ **Population breakdown in county risk** — added stacked bar (age 65+, disability, poverty, no vehicle) to risk_calculator_page.py alongside SVI sub-theme breakdown
+- ✅ All pushed to GitHub (commit 80617f9)
+
+### Session 6 (2026-03-04)
+- ✅ **Supabase index migration SQL** — created fix_v_dangerous_delay_candidates.sql: composite index on (geo_event_id, date_created DESC) for externalgeoevent + index on geoevent(geo_event_id) + rewrites view with LIMIT 2000 and DISTINCT ON optimization
+- ✅ **Channel coverage map** — channel_coverage_page.py: county-level Scattergeo map of alert channel counts (732 counties; 355 single-channel = 48%; max 23 channels in Lincoln, WA); static fallback if CSV absent; top/bottom tables; single-channel × high-SVI risk table
+- ✅ **Silent fire escalation tracker** — silent_escalation_page.py: funnel chart (silent 46,053 → evac 1 vs normal 16,643 → evac 652); spread rate × notification breakdown; state-level silent rate bar; full equity narrative
+- ✅ **Getis-Ord Gi* hotspot map** — hotspot_map_page.py: Gi* z-score computed on SVI × pct_silent per county (543 counties, 250 km threshold); Scattergeo cluster map; hot spot bar chart; county table; static fallback baked in
+- ✅ **County drill-down** — county_drilldown_page.py: full county selector (1,016 counties sortable by fires/SVI/silent/extreme/alpha); SVI tier badge; 5-metric header; SVI sub-theme + population stacked bar; fire profile donut; Gi* cluster status; alert channel coverage; USFA dept lookup; caregiver coverage gap estimate at 15%/50%/85% adoption
+- ✅ **USFA registry** — load_usfa() expanded: searches 4 path variants + attempts API download; download button added to command dashboard with link to apps.usfa.fema.gov/registry/download
+- ✅ Computed and saved: county_fire_stats.csv, county_gi_star.csv, county_channel_coverage.csv → 01_raw_data/processed/
+- ✅ All 4 new pages wired into analyst nav in wildfire_alert_dashboard.py
 - ✅ All pushed to GitHub
 
 ---
@@ -231,19 +242,19 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 
 ### Bugs to Fix
 - ✅ **Fire Predictor ValueError** — fixed `projection=dict(type="albers usa")` in fire_prediction_page.py (session 5)
-- ✅ **v_dangerous_delay_candidates timeout** — LIMIT 500 confirmed in code; ⬜ composite index on (geo_event_id, date_created) still needed in Supabase SQL editor
-- ⬜ **Signal Gap live Supabase data** — v_dangerous_delay_candidates currently falls back to hardcoded stats; fix the view performance so live data flows through
+- ✅ **v_dangerous_delay_candidates timeout** — LIMIT 500 in app code + fix_v_dangerous_delay_candidates.sql written (run in Supabase SQL editor to add indexes + rewrite view)
+- ⬜ **Signal Gap live Supabase data** — run fix_v_dangerous_delay_candidates.sql in Supabase SQL editor; once indexes are in place live data should flow through
 
 ### High-Impact Data Enhancements (from raw data analysis)
 - ✅ **Hours-to-warning and hours-to-advisory** — 3-tier timeline (advisory 6.21h / warning 1.50h / order 1.10h) added to signal_gap_analysis_page.py (session 5)
 - ✅ **SVI sub-theme breakdown** — per-county sub-theme bar chart + primary driver label added to risk_calculator_page.py; svi_minority strongest correlate (session 5)
 - ✅ **Temporal fire pattern page** — temporal_fire_pattern_page.py created; hour-of-day + monthly + heatmap + equity narrative; wired into analyst nav (session 5)
 - ✅ **Extreme fires with no evacuation** — donut + metrics (211/298, 70.8%) added to signal_gap_analysis_page.py (session 5)
-- ⬜ **Channel coverage map** — external geoevent `channel` column has region-level incident channels (incidents-ca_s4, incidents-montana, etc.); build a county-level map showing which counties have multi-channel coverage vs single-channel dependency
-- ⬜ **Silent fire escalation tracker** — build a Supabase view showing silent → normal → order conversion rates (near-zero); the simple bar explainer is in signal_gap_analysis_page.py but the tracker view is unbuilt
+- ✅ **Channel coverage map** — channel_coverage_page.py built (session 6); 732 counties, 48% single-channel, Scattergeo map + risk table
+- ✅ **Silent fire escalation tracker** — silent_escalation_page.py built (session 6); funnel chart + spread rate breakdown + state-level rates
 - ✅ **Fire perimeter data quality note** — expander added to command_dashboard_page.py (session 5)
 - ✅ **Population breakdown in county risk** — stacked bar (age65 / disability / poverty / no-vehicle) added to risk_calculator_page.py (session 5)
-- ⬜ **USFA registry** — download from apps.usfa.fema.gov/registry/download, save as src/usfa-registry-national.csv; enables full Fire Dept Resources tab
+- ✅ **USFA registry** — load_usfa() tries 4 paths + API download; download button in Command Dashboard; county_drilldown_page.py shows dept lookup when file present
 
 ### Application Architecture (Medium-Term)
 - ⬜ **Caregiver roster import** — currently manual entry in Evacuee Tracker; add CSV bulk-upload so a community org can load 100+ residents at once
@@ -255,8 +266,8 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 
 ### Conference Presentation Priorities
 - ✅ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding — added to signal_gap_analysis_page.py (session 5)
-- ⬜ Build a county-level drill-down: click a county → see its SVI tier, fire history, active alert channels, USFA department count, and caregiver coverage estimate
-- ⬜ Getis-Ord Gi* visualization — currently only mentioned in context; implement the actual hotspot cluster map showing where delayed evacuation clusters appear statistically
+- ✅ Build a county-level drill-down — county_drilldown_page.py (session 6); 1,016 counties; SVI tier, fire history, channel coverage, USFA lookup, caregiver gap estimate
+- ✅ Getis-Ord Gi* visualization — hotspot_map_page.py (session 6); Gi* z-scores on SVI × pct_silent; Scattergeo cluster map with 90%/80% CI tiers
 - ⬜ Finalize Katie's map integration (referenced in old to-do; need her code)
 
 ---
