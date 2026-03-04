@@ -2,7 +2,7 @@
 ## WiDS Datathon 2025 · Wildfire Caregiver Alert System
 ### Project Data & Code Reference — Context Document for Future Chats
 
-*Last updated: 2026-03-04*
+*Last updated: 2026-03-04 (Session 10)*
 
 ---
 
@@ -103,7 +103,7 @@ widsdatathon-1/          ← local clone path: ~/widsdatathon-1
     ├── signal_gap_analysis_page.py           ← Signal Gap Analysis (analyst)
     ├── caregiver_start_page.py               ← Caregiver role landing page
     ├── directions_page.py                    ← OSM routing for evacuation
-    ├── fire_prediction_page.py               ← Fire escalation risk model
+    ├── fire_prediction_page.py               ← Physics-based fire spread (Van Wagner + Rothermel + FWI)
     ├── geo_map.py                            ← Full GeoJSON Folium map
     ├── impact_projection_page.py             ← Life-saving projection model
     ├── live_incident_feed.py                 ← Supabase + NASA FIRMS live feed
@@ -113,6 +113,12 @@ widsdatathon-1/          ← local clone path: ~/widsdatathon-1
     ├── chatbot.py                            ← Claude Sonnet AI assistant
     ├── data_governance.py                    ← Data governance page
     ├── evacuation_planner_page.py            ← Evacuation route planner
+    ├── ui_utils.py                           ← Shared design system (page_header, render_card, etc.)
+    ├── caregiver_county_page.py              ← Caregiver: My County (SVI, silent fire rate, channels)
+    ├── caregiver_why_page.py                 ← Caregiver: Why This App? (story-driven stats)
+    ├── dispatcher_risk_zones_page.py         ← Dispatcher: At-Risk Zones (hotspot + county drill-down)
+    ├── dispatcher_coverage_page.py           ← Dispatcher: Coverage Gaps (channel + silent escalation)
+    ├── dispatcher_resources_page.py          ← Dispatcher: Resources (USFA fire dept directory)
     └── requirements.txt
 ```
 
@@ -163,20 +169,57 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 
 ## Dashboard Pages & Role Access
 
+### Navigation Structure (Sessions 8–9 redesign)
+
+**Caregiver/Evacuee** (5 pages):
+| Nav Label | Page File | Description |
+|-----------|-----------|-------------|
+| Am I Safe? | caregiver_start_page.py | Active fires near your location |
+| Evacuation Plan | evacuation_planner_page.py | Routes, shelters, checklists |
+| Risk Calculator | risk_calculator_page.py | Personal risk profile |
+| My County | caregiver_county_page.py | Local fire stats in plain language |
+| Why This App? | caregiver_why_page.py | Why official alerts aren't enough |
+
+**Emergency Worker** (5 pages):
+| Nav Label | Page File | Description |
+|-----------|-----------|-------------|
+| Command | command_dashboard_page.py | Live incidents + evacuee tracker |
+| Fire Forecast | fire_prediction_page.py | Physics-based fire spread model |
+| At-Risk Zones | dispatcher_risk_zones_page.py | Hotspot map + county drill-down |
+| Coverage Gaps | dispatcher_coverage_page.py | Channel coverage + silent escalation |
+| Resources | dispatcher_resources_page.py | USFA fire department directory |
+
+**Data Analyst** (7 combined pages using st.tabs):
+| Nav Label | Combined From |
+|-----------|---------------|
+| Overview | About (existing) |
+| Signal Gap | Signal Gap Analysis + Silent Fire Tracker |
+| Equity & Risk | Equity Analysis + Coverage Analysis |
+| Geographic | Hotspot Map + Channel Coverage + County Drill-Down |
+| Fire Patterns | Temporal Fire Patterns + Impact Projection |
+| Technical | Data Governance + IRWIN Linkage + Zone Duration |
+| Fire Predictor | fire_prediction_page.py |
+
+### Page Status
 | Page | Role | Status |
 |------|------|--------|
-| Command Dashboard | Emergency Worker | ✅ working — hexbin map, evacuee tracker → Supabase |
-| Fire Predictor | Emergency Worker | ⚠️ ValueError in plotly layout (line 261) |
-| Start Here | Caregiver/Evacuee | ✅ working |
-| Evacuation Planner | Caregiver/Evacuee | ✅ working |
-| About | Analyst | ✅ working |
-| Equity Analysis | Analyst | ✅ working |
-| Risk Calculator | Analyst | ✅ working |
-| Impact Projection | Analyst | ✅ working |
-| Coverage Analysis | Analyst | ✅ graceful degradation (shows known stats) |
-| Zone Duration | Analyst | ✅ graceful degradation (332MB CSV not deployed) |
-| Data Governance | Analyst | ✅ working |
-| Signal Gap Analysis | Analyst | ✅ working — uses fallback stats when Supabase views return 0 |
+| Command | Emergency Worker | ✅ working — hexbin map, evacuee tracker, SMS alerts |
+| Fire Forecast | Emergency Worker | ✅ working — Van Wagner ellipse + Rothermel spread + FWI + Open-Meteo |
+| At-Risk Zones | Emergency Worker | ✅ working — wraps hotspot_map + county_drilldown |
+| Coverage Gaps | Emergency Worker | ✅ working — wraps channel_coverage + silent_escalation |
+| Resources | Emergency Worker | ✅ working — USFA directory (CSV needed for full lookup) |
+| Am I Safe? | Caregiver | ✅ working — bilingual EN/ES |
+| Evacuation Plan | Caregiver | ✅ working |
+| Risk Calculator | Caregiver | ✅ working |
+| My County | Caregiver | ✅ working |
+| Why This App? | Caregiver | ✅ working |
+| Overview | Analyst | ✅ working |
+| Signal Gap | Analyst | ✅ working — uses fallback stats when Supabase returns 0 |
+| Equity & Risk | Analyst | ✅ working |
+| Geographic | Analyst | ✅ working |
+| Fire Patterns | Analyst | ✅ working |
+| Technical | Analyst | ✅ working |
+| Fire Predictor | Analyst | ✅ working |
 
 ---
 
@@ -245,6 +288,36 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ **IRWIN incident linkage** — irwin_linkage_page.py: new analyst page; parses IRWINID/IncidentName/GACC/GISAcres/IncidentTypeCategory from source_extra_data JSON (4,767/6,207 = 76.8% linked); searchable/filterable table; GACC and incident-type breakdown; InciWeb search links per incident; methodology note; wired into wildfire_alert_dashboard.py analyst nav + routing
 - ✅ Commit 3abe900 pushed to GitHub
 
+### Session 8 (2026-03-04) — UI Navigation Redesign
+- ✅ **Role-scoped navigation** — replaced flat 15-tab analyst nav with _NAV_CONFIG dict; 3 role groups with icon-prefixed buttons and tooltip descriptions; active page highlighted with primary button type + CSS left border + subtle tint
+- ✅ **5 new caregiver pages** — caregiver_county_page.py (My County), caregiver_why_page.py (Why This App?); existing risk_calculator_page.py moved to caregiver role
+- ✅ **5 emergency worker pages** — dispatcher_risk_zones_page.py (At-Risk Zones), dispatcher_coverage_page.py (Coverage Gaps), dispatcher_resources_page.py (Resources) — wrapper pages around existing analyst pages
+- ✅ **Analyst page consolidation** — 15 old pages consolidated to 7 nav items using st.tabs() for combined pages (Signal Gap, Equity & Risk, Geographic, Fire Patterns, Technical)
+- ✅ Commit d398e55 pushed to GitHub
+
+### Session 9 (2026-03-04) — UX Psychology Redesign
+- ✅ **ui_utils.py** — shared design system: page_header(), section_header(), render_card(), fallback_card(), data_source_badge(), caregiver_progress_html(); design tokens: #0d1117 bg, #161b22 surface, #FF4B4B red, #d4a017 amber, #3fb950 green
+- ✅ **Dark theme CSS** — wildfire_alert_dashboard.py: Google Fonts (DM Sans), #0d1117 global background, styled metric containers, expanders, tabs, inputs, CTA buttons; 60-30-10 color system
+- ✅ **Role sidebar secondary controls** — analyst: state+year filters; caregiver: county input + endowed progress bar; responder: region + live toggle
+- ✅ **First-run onboarding** — _render_onboarding(): 3-step caregiver wizard + responder area selector; gated by session_state.get("onboarded") is None; skips auth flow
+- ✅ **risk_calculator_page.py rewrite** — F-pattern layout (2:1 columns: inputs left, context right); SVI detail in expander; "Build My Evacuation Plan" CTA navigates to Evacuation Plan page; results stored in session_state.risk_results
+- ✅ **signal_gap_analysis_page.py** — progressive disclosure: detail tables and agency charts moved into st.expander(); extreme fires and silent fire sections in expanded expanders
+- ✅ **caregiver_start_page.py** — styled header with bilingual translation preserved; "Why Act Early?" metrics in expander
+- ✅ Commit d398e55 pushed to GitHub (combined with session 8)
+
+### Session 10 (2026-03-04) — Physics-Based Fire Prediction
+- ✅ **fire_prediction_page.py complete rewrite** (1,017 lines added/370 removed):
+  - **Van Wagner (1969)** elliptical fire shape model: L/W = 0.936·exp(0.2566·w) + 0.461·exp(-0.1548·w) − 0.397; eccentricity, back/head/flank spread rates, ellipse geometry with geographic projection
+  - **Rothermel (1972)** surface fire spread rate: R = R0 × η_M × (1 + φ_W + φ_S); moisture damping η_M (eq. 25), wind coefficient φ_W = a·(U/10)^b calibrated to BehavePlus NFFL fuel models (Grass 1, Chaparral 4, Southern Rough 7, Timber Litter 8, Logging Slash 11), slope coefficient φ_S = 5.275·tan²(θ)
+  - **Byram (1959)** fireline intensity: I = h × w × R (kW/m)
+  - **Canadian FWI system** (Van Wagner & Pickett 1985, TR-33): full FFMC, ISI, DMC, DC, BUI, FWI equations; five danger classes; fuel moisture derived from FFMC
+  - **Open-Meteo** live weather (ECMWF) + CAMS AQI APIs (free, no key): temperature, RH, wind speed/direction, precipitation; US AQI, PM2.5, PM10, dust, CO
+  - **Scattermapbox** with open-street-map tiles; fire perimeter ellipses at 1h/3h/6h/12h/24h (color gradient yellow → deep red); ignition point marker; wind/spread direction arrow; fill="toself" for closed polygon traces
+  - Wind direction: Open-Meteo meteorological "FROM" convention auto-converted to fire spread "TO" direction (+180°)
+  - 3 tabs: Spot Fire Spread | Fire Weather & AQI | Risk Zone Forecast
+  - "Risk Zone Forecast" tab preserves FIRMS hotspot cluster map from original page
+- ✅ Commit 02c5b98 pushed to GitHub
+
 ---
 
 ## Current To-Do List (Pre-April Conference)
@@ -272,6 +345,9 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ **Mobile-responsive redesign** — @media (≤768px) CSS; column stacking, tap targets, iOS zoom prevention; PWA meta tags added (session 7)
 - ✅ **PWA / offline mode** — PWA meta tags added; true service worker not possible in Streamlit; download evacuation plan as HTML not yet implemented
 - ✅ **IRWIN incident linkage** — irwin_linkage_page.py; 4,767/6,207 perimeter records linked; searchable table with GACC/type filters; InciWeb links (session 7)
+- ✅ **UI navigation redesign** — role-scoped _NAV_CONFIG; icon-prefixed buttons with tooltips; caregiver/dispatcher specific pages; analyst 15→7 consolidated pages (session 8)
+- ✅ **UX psychology overhaul** — dark theme, F-pattern layouts, progressive disclosure, onboarding, shared ui_utils.py design system (session 9)
+- ✅ **Physics-based fire prediction** — Van Wagner ellipse + Rothermel spread + FWI + Open-Meteo live weather/AQI; map with fire perimeter ellipses; 3-tab layout (session 10)
 
 ### Conference Presentation Priorities
 - ✅ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding — added to signal_gap_analysis_page.py (session 5)
