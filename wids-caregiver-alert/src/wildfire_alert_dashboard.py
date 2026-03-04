@@ -44,6 +44,7 @@ import streamlit as st
 
 from live_incident_feed import load_fire_data
 from ui_utils import caregiver_progress_html, data_source_badge
+from demo_mode import get_demo_state, render_demo_banner
 from auth_supabase import (
     render_auth_page,
     render_user_profile_sidebar,
@@ -419,6 +420,18 @@ username = st.session_state.username
 fire_data, fire_source, fire_label = load_fire_data()
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HOME PAGE GATE (Improvement 3)
+# Show on first visit after login; also when user clicks "← Change role"
+# ─────────────────────────────────────────────────────────────────────────────
+if "show_home" not in st.session_state:
+    st.session_state.show_home = True   # first visit after login → show splash
+
+if st.session_state.get("show_home"):
+    from home_page import render_home_page
+    render_home_page()
+    st.stop()
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
 if "show_ai_panel" not in st.session_state:
@@ -651,7 +664,14 @@ with st.sidebar:
         with st.expander("Filters", expanded=False):
             st.selectbox(
                 "State",
-                ["All States", "CA", "OR", "WA", "TX", "CO", "NM", "AZ", "MT", "ID", "NV", "FL"],
+                [
+                    "All States",
+                    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+                    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+                    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+                    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+                ],
                 key="sidebar_state_filter",
             )
             st.slider("Year range", 2021, 2025, (2021, 2025), key="sidebar_year_range")
@@ -693,6 +713,18 @@ with st.sidebar:
         _end_and_save_session(username)
         sign_out(username)
         st.rerun()
+
+    # ── Change role link (returns to home splash) ──────────────────────────
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    if st.button("← Change role", key="change_role_btn", use_container_width=True):
+        st.session_state.show_home = True
+        st.rerun()
+
+    # ── Demo Mode toggle (Improvement 1) ──────────────────────────────────
+    st.divider()
+    demo_mode = st.toggle("🎬 Demo Mode", value=False, key="demo_mode")
+    if demo_mode:
+        st.info("📍 Scenario: Ventura County, CA — 2am fire detection near high-SVI neighborhood")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1057,8 +1089,24 @@ page = st.session_state.current_page
 
 
 def _render_page():
+    # ── Demo banner (Improvement 1) — shown on every page when demo mode is on ──
+    render_demo_banner()
+
     # ── Emergency Worker ──────────────────────────────────────────────────────
     if page == "Command":
+        # Improvement 2: NASA FIRMS live fire card at top of Command page
+        try:
+            from nasa_firms_live import (
+                get_most_significant_fire, firms_status_badge,
+                render_live_fire_card, LIVE_DOT_CSS,
+            )
+            st.markdown(LIVE_DOT_CSS, unsafe_allow_html=True)
+            live_fire, live_source = get_most_significant_fire()
+            st.markdown(firms_status_badge(live_source), unsafe_allow_html=True)
+            st.markdown(render_live_fire_card(live_fire, live_source), unsafe_allow_html=True)
+        except Exception:
+            pass  # graceful degradation — no NASA FIRMS, just show WiDS feed
+
         from command_dashboard_page import render_command_dashboard
         render_command_dashboard(fire_data, fire_source, fire_label)
 

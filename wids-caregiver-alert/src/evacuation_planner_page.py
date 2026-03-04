@@ -733,6 +733,41 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
                 if s.get("website"):
                     st.markdown(f"[Website]({s['website']})")
 
+    # ── PDF Evacuation Plan Download (Improvement 4) ─────────────────────────
+    st.markdown("---")
+    st.subheader("Download Your Evacuation Plan")
+    _pdf_county = st.session_state.search_address.strip().title() if st.session_state.search_address else "Your Area"
+    _pdf_household = {
+        "Location":            _pdf_county,
+        "Destination":         dest_name,
+        "Shelter (nearest)":   shelters_for_pdf[0]["name"] if (shelters_for_pdf := all_shelters_by_cat.get("General", [])) else "See shelter list above",
+        "Nearby fire threats": f"{len(nearest_fires)} within 100 miles" if nearest_fires else "None detected",
+        "Generated":           datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    try:
+        from pdf_export import generate_evacuation_plan, REPORTLAB_AVAILABLE
+        if REPORTLAB_AVAILABLE:
+            _pdf_buffer = generate_evacuation_plan(
+                county=_pdf_county,
+                risk_level="HIGH" if nearest_fires and nearest_fires[0]["distance"] < 15 else
+                           "MEDIUM" if nearest_fires else "LOW",
+                household=_pdf_household,
+                checklist_items=None,  # uses default comprehensive checklist
+            )
+            if _pdf_buffer:
+                st.download_button(
+                    label="📄 Download My Evacuation Plan",
+                    data=_pdf_buffer,
+                    file_name=f"evacuation_plan_{_pdf_county.replace(' ', '_').replace(',', '')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                )
+        else:
+            st.info("Install `reportlab` (`pip install reportlab`) to enable PDF export.")
+    except Exception as _pdf_err:
+        st.caption(f"PDF export unavailable: {_pdf_err}")
+
     # ── CTA to Directions page ──
     st.markdown("---")
     st.info(

@@ -48,9 +48,128 @@ def load_real_data():
     return None
 
 
+def calculate_impact(hours_reduction: float) -> dict:
+    """
+    Model: if alert delay is reduced by X hours in high-SVI counties,
+    how many additional households receive warnings in the critical window?
+
+    Based on WiDS 2021–2025 data:
+    - 653 fires had evacuation actions
+    - 39.8% were in high-SVI counties = ~260 fires
+    - Median delay high-SVI: 12.6h, low-SVI: 1.1h
+    - Average household size in high-SVI wildfire counties: 2.7 people
+    - Average affected population per high-SVI fire: ~4,800 people
+    - Critical window: first 2 hours after detection
+    """
+    HIGH_SVI_FIRES = 260
+    AVG_POPULATION_PER_FIRE = 4_800
+    AVG_HOUSEHOLD_SIZE = 2.7
+    HIGH_SVI_MEDIAN_DELAY = 12.6
+
+    # How many fires fall within 2-hour critical window after reduction?
+    fires_in_window_before = HIGH_SVI_FIRES * 0.08   # 8% currently within 2hr
+    fires_in_window_after  = HIGH_SVI_FIRES * min(
+        1.0,
+        0.08 + (hours_reduction / HIGH_SVI_MEDIAN_DELAY) * 0.92
+    )
+
+    additional_fires  = fires_in_window_after - fires_in_window_before
+    additional_people = additional_fires * AVG_POPULATION_PER_FIRE
+    additional_hh     = additional_people / AVG_HOUSEHOLD_SIZE
+    new_delay         = max(0.0, HIGH_SVI_MEDIAN_DELAY - hours_reduction)
+
+    return {
+        "additional_fires_alerted":     round(additional_fires),
+        "additional_people_protected":  round(additional_people),
+        "additional_households":        round(additional_hh),
+        "new_median_delay":             round(new_delay, 1),
+        "pct_improvement":              round((hours_reduction / HIGH_SVI_MEDIAN_DELAY) * 100, 1),
+    }
+
+
+def _render_delay_reduction_section():
+    """Interactive delay-reduction impact calculator (Improvement 5)."""
+    st.subheader("Delay Reduction Impact Model")
+    st.caption(
+        "Model: if we reduce alert delay in high-SVI counties by X hours, "
+        "how many more households get warnings within the critical 2-hour window?"
+    )
+
+    hours_reduction = st.slider(
+        "If we reduce alert delay by:",
+        min_value=0.0, max_value=12.0, value=4.0, step=0.5,
+        format="%.1f hours",
+        help="Slide to model the effect of faster alerting in the 260 high-SVI fires per year.",
+    )
+
+    result = calculate_impact(hours_reduction)
+
+    mc1, mc2, mc3 = st.columns(3)
+    with mc1:
+        st.metric(
+            "Additional fires alerted\nin critical 2-hr window",
+            f"+{result['additional_fires_alerted']}",
+            help="Fires where evacuation order now arrives within 2 hours of detection",
+        )
+    with mc2:
+        st.metric(
+            "Additional people protected\nin critical window",
+            f"+{result['additional_people_protected']:,}",
+            help="Avg 4,800 residents per high-SVI fire event",
+        )
+    with mc3:
+        st.metric(
+            "Improvement in high-SVI\nresponse time",
+            f"{result['pct_improvement']}%",
+            delta=f"New median: {result['new_median_delay']}h (was 12.6h)",
+        )
+
+    # ── Line chart: full curve ────────────────────────────────────────────────
+    x_vals = np.linspace(0, 12, 100)
+    y_people = [calculate_impact(h)["additional_people_protected"] for h in x_vals]
+    current_y = result["additional_people_protected"]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=x_vals, y=y_people,
+        mode="lines",
+        fill="tozeroy",
+        fillcolor="rgba(255, 75, 75, 0.12)",
+        line=dict(color="#FF4B4B", width=2.5),
+        name="People protected",
+    ))
+    fig.add_vline(
+        x=hours_reduction,
+        line_dash="dash",
+        line_color="#d4a017",
+        annotation_text=f"{hours_reduction:.1f}h → +{current_y:,} people",
+        annotation_position="top right",
+        annotation_font_color="#d4a017",
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        xaxis_title="Hours of delay reduction",
+        yaxis_title="Additional people protected",
+        height=320,
+        margin=dict(l=50, r=20, t=20, b=40),
+        showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.warning(
+        "⚠️ **Methodology note:** These projections are modeled estimates based on "
+        "WiDS 2021–2025 historical patterns. Actual impact depends on fire behavior, "
+        "population distribution, and alert channel availability."
+    )
+    st.divider()
+
+
 def render_impact_projection_page():
     st.title("Impact Projection")
     st.caption("All projections are anchored to real WiDS 2021–2025 baseline data and published evacuation mortality literature.")
+
+    # ── Improvement 5: Delay reduction model (shown first) ──────────────────
+    _render_delay_reduction_section()
 
     # ── Data source disclosure ──
     with st.expander("Data sources & methodology", expanded=False):
