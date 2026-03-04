@@ -2,10 +2,12 @@
 ## WiDS Datathon 2025 · Wildfire Caregiver Alert System
 ### Project Data & Code Reference — Context Document for Future Chats
 
+*Last updated: 2026-03-04*
+
 ---
 
 ## Project Overview
-This system predicts evacuation delays for vulnerable populations during wildfires and routes proactive alerts to caregivers. It is the 49ers Intelligence Lab's submission to the WiDS Datathon 2025, currently in 2nd place.
+This system predicts evacuation delays for vulnerable populations during wildfires and routes proactive alerts to caregivers. It is the 49ers Intelligence Lab's submission to the WiDS Datathon 2025.
 
 **Core Research Question:** Do vulnerable populations (elderly, disabled, low-income) experience systematically longer evacuation delays during wildfires, and can a data-driven alert system reduce those delays?
 
@@ -23,9 +25,18 @@ This system predicts evacuation delays for vulnerable populations during wildfir
 - Mean delay: **22.3 hours** (heavily right-skewed by slow-response fires)
 - 90th percentile: **32.1 hours** — 1 in 10 fires takes over a day to get an order
 - Fires in **vulnerable counties grow 17% faster** (11.71 vs 10.00 acres/hour)
-- Vulnerable counties receive orders slightly faster at the median, but face faster-growing fires leaving less real response time
-- 39.8% of all fire events occur in high-vulnerability counties (SVI ≥ 0.75)
-- **41,906 fires had early warning signals; 99.7% received no evacuation action** (from geo_events_externalgeoevent signal analysis)
+- **73% of fires are "silent"** — 46,053 of 62,696 events had `notification_type = silent`, meaning the public received no alert
+- Of 46,053 silent fires, only **1** received an evacuation order — the system almost never escalates silent fires
+- Of 298 fires classified "extreme" spread rate, **211 (70.8%) received no evacuation action**
+- Only **653 of 62,696 fires** (1.04%) ever triggered a formal evacuation order or warning
+- Only **4,429 of 62,696 fires** (7.1%) have a confirmed link to any evacuation zone
+- **39.8%** of all fire events occur in high-vulnerability counties (SVI ≥ 0.75)
+- 41,906 fires had early warning signals with no evacuation action (from geo_events_externalgeoevent signal analysis)
+
+### Seasonal and Temporal Patterns (newly discovered)
+- Peak fire months: **July (13,650 fires)**, **August (11,554)**, **June (8,726)** — June–August = 54% of all 2021–2025 fires
+- Peak fire ignition hours: **8pm–midnight UTC** (20:00–00:00) — fires most often detected at night
+- This matters: nighttime fires hit sleeping populations with no-vehicle or mobility limitations hardest
 
 ### Modeled/Projected Findings
 - Caregiver alert system projects saving 500–1,500 lives/year at 65% caregiver adoption
@@ -38,41 +49,70 @@ This system predicts evacuation delays for vulnerable populations during wildfir
 
 ---
 
+## Technology Gap This System Addresses
+
+Existing wildfire alert tools (WatchDuty, Genasys Protect, Nixle, Wireless Emergency Alerts):
+- Only notify when an official order is already issued — **no pre-order early warning**
+- Alert individuals directly — **no caregiver intermediary routing**
+- No equity analysis — **no visibility into whether vulnerable populations are systematically underserved**
+- Show fires, not populations — **no integration of SVI vulnerability with alert timing**
+- No coordination gap index — **no view of single-source vs multi-source reporting by county**
+- No silent fire detection — **73% of fires never get public alerts at all**
+
+**What this system uniquely does:**
+1. Detects the "signal gap window" — fire detected, no public alert yet — and routes early alerts to caregivers
+2. Prioritizes by SVI vulnerability tier, not just proximity
+3. Shows which counties rely on a single reporting agency (coordination fragility)
+4. Visualizes the silent notification epidemic using real WiDS data
+5. Provides an evacuee tracker for dispatchers synced to Supabase in real time
+6. Integrates USFA fire department resources with SVI vulnerability maps at county level
+7. Hexagonal density map of 62k+ historical fire events for spatial pattern recognition
+
+---
+
 ## Repository Structure
 ```
 widsdatathon-1/          ← local clone path: ~/widsdatathon-1
 ├── requirements.txt
 ├── .gitignore
 ├── 01_raw_data/
-│   ├── external/SVI_2022_US_county.csv
-│   └── processed/fire_events_with_svi_and_delays.csv  ← 15MB, force-committed with git add -f
+│   ├── geo_events_geoevent.csv               ← 62,696 fire events 2021–2025
+│   ├── geo_events_geoeventchangelog.csv      ← 1.03M rows, evacuation timing source
+│   ├── geo_events_externalgeoevent.csv       ← 1.5M rows, alert channel distribution
+│   ├── geo_events_externalgeoeventchangelog.csv
+│   ├── evac_zones_gis_evaczone.csv           ← 37,458 evacuation zone polygons (195MB)
+│   ├── evac_zones_gis_evaczonechangelog.csv  ← 332MB zone change history
+│   ├── evac_zone_status_geo_event_map.csv    ← 4,429 zone-to-fire linkages
+│   ├── fire_perimeters_gis_fireperimeter.csv ← 6,207 fire perimeter polygons
+│   ├── fire_perimeters_gis_fireperimeterchangelog.csv
+│   ├── external/
+│   │   └── SVI_2022_US_county.csv            ← CDC Social Vulnerability Index
+│   └── processed/
+│       ├── fire_events_with_svi_and_delays.csv  ← 15MB, force-committed with git add -f
+│       ├── evac_zones_map.geojson
+│       └── fire_perimeters_approved.geojson
 ├── 02_documentation/
-│   └── WiDS_Context_Document.md
+│   └── WiDS_Context_Document.md             ← this file
 ├── 03_analysis_scripts/
-│   └── 07_build_real_delays.py   ← main data pipeline (~3 min, outputs fire_events_with_svi_and_delays.csv)
-└── wids-caregiver-alert/src/     ← Streamlit Cloud main file path
-    ├── wildfire_alert_dashboard.py       ← MAIN APP
-    ├── auth_supabase.py                  ← Supabase auth (from Nadia)
-    ├── signal_gap_analysis_page.py       ← NEW: Signal Gap Analysis page
-    ├── data_governance.py                ← from Nadia
-    ├── chatbot.py                        ← from Nadia
-    ├── real_data_insights.py
-    ├── agency_coverage_page.py
-    ├── alert_channel_equity_page.py
-    ├── caregiver_start_page.py
-    ├── command_dashboard_page.py
-    ├── coverage_analysis_page.py
-    ├── fire_prediction_page.py
-    ├── impact_projection_page.py
-    ├── live_incident_feed.py
-    ├── real_data_insights.py
-    ├── risk_calculator_page.py
-    ├── zone_duration_page.py
-    ├── directions_page.py
-    ├── geo_map.py
-    ├── fire_data_integration.py
-    ├── evacuation_planner_page.py
-    ├── usfa-registry-national.csv
+│   └── 07_build_real_delays.py              ← main data pipeline (~3 min)
+└── wids-caregiver-alert/src/                ← Streamlit Cloud main file path
+    ├── wildfire_alert_dashboard.py            ← MAIN APP (entry point)
+    ├── auth_supabase.py                       ← Custom PBKDF2 auth + forgot credentials
+    ├── command_dashboard_page.py              ← Emergency Worker view (hexbin map)
+    ├── coverage_analysis_page.py             ← Agency Coverage + Alert Channel Equity
+    ├── signal_gap_analysis_page.py           ← Signal Gap Analysis (analyst)
+    ├── caregiver_start_page.py               ← Caregiver role landing page
+    ├── directions_page.py                    ← OSM routing for evacuation
+    ├── fire_prediction_page.py               ← Fire escalation risk model
+    ├── geo_map.py                            ← Full GeoJSON Folium map
+    ├── impact_projection_page.py             ← Life-saving projection model
+    ├── live_incident_feed.py                 ← Supabase + NASA FIRMS live feed
+    ├── real_data_insights.py                 ← WiDS findings explorer
+    ├── risk_calculator_page.py               ← Personal risk profile tool
+    ├── zone_duration_page.py                 ← Zone escalation duration analysis
+    ├── chatbot.py                            ← Claude Sonnet AI assistant
+    ├── data_governance.py                    ← Data governance page
+    ├── evacuation_planner_page.py            ← Evacuation route planner
     └── requirements.txt
 ```
 
@@ -92,6 +132,8 @@ widsdatathon-1/          ← local clone path: ~/widsdatathon-1
 | fire_events | 62,696 | Uploaded from fire_events_with_svi_and_delays.csv |
 | evacuation_status | live | Caregiver evacuee tracker (persistent, role-based) |
 | evacuation_changelog | live | Tracks status changes |
+| users | live | Custom PBKDF2 auth (username, password_hash, password_salt, email, role) |
+| user_events | live | Audit log (LOGIN, LOGOUT, PASSWORD_RESET, etc.) |
 | caregiver_access_codes | 3 | EVAC-DEMO2025, DISPATCH-2025, ANALYST-WiDS9 |
 
 ### Views (queried by signal_gap_analysis_page.py)
@@ -101,15 +143,14 @@ widsdatathon-1/          ← local clone path: ~/widsdatathon-1
 | v_delay_benchmark | ✅ returns data | geo_event_id, first_signal_time, first_action_time, mins_signal_to_action |
 | v_delay_summary_by_region_source | ✅ returns data | delay by region/agency |
 | v_signal_without_action | ✅ returns data | fires with signal, no action |
-| v_dangerous_delay_candidates | ⚠️ timeout | query too slow on 1.6M rows — needs index or limit |
-
-**Note:** Views pull from geo_events_externalgeoevent (1.6M rows) + evac_zone_status_geo_event_map. The fire_events table is separate and feeds different analysis.
+| v_dangerous_delay_candidates | ⚠️ timeout | query too slow on 1.6M rows — needs index or LIMIT |
 
 ### RLS Status
 - geo_events_externalgeoevent: RLS disabled (public read)
 - evac_zone_status_geo_event_map: RLS disabled (public read)
 - geo_events_geoevent: RLS disabled (public read)
 - fire_events: RLS disabled, anon insert allowed
+- users: RLS enabled — users can only read their own row
 
 ### Secrets (Streamlit Cloud + .streamlit/secrets.toml)
 ```toml
@@ -124,8 +165,8 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 
 | Page | Role | Status |
 |------|------|--------|
-| Command Dashboard | Emergency Worker | ✅ working, evacuee tracker → Supabase |
-| Fire Predictor | Emergency Worker | ⚠️ ValueError in plotly layout (fire_prediction_page.py line 261) |
+| Command Dashboard | Emergency Worker | ✅ working — hexbin map, evacuee tracker → Supabase |
+| Fire Predictor | Emergency Worker | ⚠️ ValueError in plotly layout (line 261) |
 | Start Here | Caregiver/Evacuee | ✅ working |
 | Evacuation Planner | Caregiver/Evacuee | ✅ working |
 | About | Analyst | ✅ working |
@@ -134,8 +175,7 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 | Impact Projection | Analyst | ✅ working |
 | Coverage Analysis | Analyst | ✅ graceful degradation (shows known stats) |
 | Zone Duration | Analyst | ✅ graceful degradation (332MB CSV not deployed) |
-| Fire Predictor | Analyst | ⚠️ same plotly error |
-| Data Governance | Analyst | ✅ working (from Nadia) |
+| Data Governance | Analyst | ✅ working |
 | Signal Gap Analysis | Analyst | ✅ working — uses fallback stats when Supabase views return 0 |
 
 ---
@@ -148,43 +188,151 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 | caregiver_test | WiDS@2025! | Caregiver/Evacuee | none needed |
 | analyst_test | WiDS@2025! | Data Analyst | ANALYST-WiDS9 |
 
-**Old hardcoded credentials (removed, replaced by Supabase auth):**
-dispatcher/fire2025, caregiver/evacuate, analyst/datathon
+**Auth system:** Custom PBKDF2-HMAC-SHA256 against `public.users` table — NOT Supabase Auth.
+
+---
+
+## Completed Work Log
+
+### Session 1–3 (Earlier)
+- ✅ Built data pipeline `07_build_real_delays.py` → `fire_events_with_svi_and_delays.csv`
+- ✅ Core dashboard pages (signal gap, coverage, equity, zone duration, risk calculator, impact projection)
+- ✅ Supabase upload: geo_events_geoevent (62,696 rows), fire_events table, evacuation_status table
+- ✅ Supabase views: v_dashboard_kpis, v_delay_benchmark, v_delay_summary_by_region_source
+- ✅ Integrated Nadia's auth_supabase.py, chatbot.py, data_governance.py
+- ✅ Added caregiver access codes: DISPATCH-2025, ANALYST-WiDS9
+- ✅ Fixed geo_event_id type mismatch ("22429.0" vs "22429")
+
+### Session 4 (Most Recent — 2026-03)
+- ✅ **Emoji removal** — stripped decorative emoji from all 13 dashboard pages; kept page_icon="🔥", icon= params, and data values like "Evacuated ✅"
+- ✅ **Streamlit 1.50 deprecation fix** — `st.image(use_container_width=True)` → `st.image(width="stretch")` in wildfire_alert_dashboard.py and auth_supabase.py
+- ✅ **HTML comment render fix** — removed `<!-- NOTE: fire_events dedup resolved -->` from st.markdown() in analyst About page (was rendering as visible text)
+- ✅ **Forgot username/password flow** — added inline recovery panel to login page: look up username by email (ilike query), or reset password (generates Tmp+8 random chars temp password, writes PBKDF2 hash to Supabase, logs PASSWORD_RESET event)
+- ✅ **Command dashboard hexbin map** — replaced Folium CircleMarker heatmap with `plotly.figure_factory.create_hexbin_mapbox` (nx_hexagon=40, YlOrRd, carto-darkmatter); loads 61,691 real wildfire points from geo_events_geoevent.csv + live NASA FIRMS; renders client-side (immediate load); SVI centroids as overlay scatter; auto-centers per state
+- ✅ **USFA tab graceful degradation** — replaced st.error() + return with st.info() + known aggregate stats + download link; tab no longer crashes blank
+- ✅ **Cached data loaders** — added @st.cache_data to load_svi_centroids() and new load_geo_events() (ttl=900s) in command_dashboard_page.py
+- ✅ All pushed to GitHub (commit 2780fbc)
 
 ---
 
 ## Current To-Do List (Pre-April Conference)
 
-✅ Fix directions_page.py syntax error (nested f-string line 1301)
-✅ Database backend for evacuee tracker (Supabase evacuation_status table)
-✅ Zone duration — graceful degradation is sufficient (real stats shown)
-✅ Deploy geo_events_geoevent to Supabase (live_incident_feed.py now queries it first)
-✅ Integrate Nadia's auth_supabase.py, data_governance.py, chatbot.py
-✅ Add Signal Gap Analysis page (analyst role)
-✅ Upload fire_events_with_svi_and_delays.csv to Supabase fire_events table (62,696 rows)
-✅ Add DISPATCH-2025 and ANALYST-WiDS9 to caregiver_access_codes table
+### Bugs to Fix
+- ⬜ **Fire Predictor ValueError** — fire_prediction_page.py ~line 261, plotly update_layout syntax error in `showstates` / geo projection
+- ⬜ **v_dangerous_delay_candidates timeout** — add `LIMIT 500` or a composite index on (geo_event_id, date_created) on the Supabase view
+- ⬜ **Signal Gap live Supabase data** — v_dangerous_delay_candidates currently falls back to hardcoded stats; fix the view performance so live data flows through
 
-⬜ Fix Fire Predictor ValueError (fire_prediction_page.py line 261, plotly update_layout)
-⬜ Combine Lena + Katie maps / faster fire loading — need Katie's code
-⬜ Fix v_dangerous_delay_candidates timeout (add index or LIMIT to view query)
-⬜ Signal Gap Analysis: wire live Supabase data for the candidates table (currently fallback stats)
+### High-Impact Data Enhancements (from raw data analysis)
+- ⬜ **Hours-to-warning and hours-to-advisory** — fire_events_with_svi_and_delays.csv has `hours_to_warning` and `hours_to_advisory` columns, not just `hours_to_order`. Dashboard only shows order delays. Adding warning/advisory timelines reveals an earlier intervention window (~30–45 min before order)
+- ⬜ **SVI sub-theme breakdown** — dataset has `svi_socioeconomic`, `svi_household`, `svi_minority`, `svi_housing` — identify which vulnerability dimension drives delay most; enhance risk calculator to show which sub-theme is the primary risk driver
+- ⬜ **Temporal fire pattern page** — add hour-of-day fire distribution (peak 8pm–midnight) and monthly seasonality (July peak: 13,650 fires) as a new analyst tab; this is an untapped story in the raw data
+- ⬜ **Extreme fires with no evacuation** — 211 of 298 extreme-spread fires received no evacuation action; these are the highest-risk events and currently invisible in the dashboard
+- ⬜ **Channel coverage map** — external geoevent `channel` column has region-level incident channels (incidents-ca_s4, incidents-montana, etc.); build a county-level map showing which counties have multi-channel coverage vs single-channel dependency
+- ⬜ **Silent fire escalation tracker** — 46,053 fires are "silent"; build a view showing how many progress from silent → normal notification → order; the conversion rate is near-zero and that's the central equity argument
+- ⬜ **Fire perimeter data quality note** — 883 rejected + 1,185 pending out of 6,207 perimeter records (33.5% not approved); surface this as a data quality indicator in the Command Dashboard
+- ⬜ **Population breakdown in county risk** — pop_age65, pop_disability, pop_poverty, pop_no_vehicle are in the processed data; add a stacked bar showing composition of vulnerable population per county in the risk calculator
+- ⬜ **USFA registry** — download from apps.usfa.fema.gov/registry/download, save as src/usfa-registry-national.csv; enables full Fire Dept Resources tab
+
+### Application Architecture (Medium-Term)
+- ⬜ **Caregiver roster import** — currently manual entry in Evacuee Tracker; add CSV bulk-upload so a community org can load 100+ residents at once
+- ⬜ **SMS integration** — Twilio or AWS SNS to actually send the caregiver alert via SMS (currently UI-only simulation); ~$0.0075/SMS
+- ⬜ **Multi-language support** — Spanish translation for California counties where wildfire risk and non-English speaker overlap is highest (Riverside, San Bernardino, Los Angeles)
+- ⬜ **Mobile-responsive redesign** — evacuees use phones; current layout is desktop-first; caregiver_start_page.py and evacuation_planner_page.py need mobile breakpoints
+- ⬜ **PWA / offline mode** — during power outages, evacuees lose internet; a Progressive Web App with cached evacuation routes would survive connectivity loss
+- ⬜ **IRWIN incident linkage** — fire_perimeters have `IRWINID` in source_extra_data JSON; this is the national incident ID used by USFS, BLM, CAL FIRE; linking would give access to official resource allocation, crew assignments, and suppression costs
+
+### Conference Presentation Priorities
+- ⬜ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding (slides + dashboard callout)
+- ⬜ Build a county-level drill-down: click a county → see its SVI tier, fire history, active alert channels, USFA department count, and caregiver coverage estimate
+- ⬜ Getis-Ord Gi* visualization — currently only mentioned in context; implement the actual hotspot cluster map showing where delayed evacuation clusters appear statistically
+- ⬜ Finalize Katie's map integration (referenced in old to-do; need her code)
 
 ---
 
-## Raw Data Files (01_raw_data/)
-Large files — do not commit to git (except fire_events_with_svi_and_delays.csv via git add -f).
+## Raw Data Files — Full Column Reference
 
-| File | Size | What It Is |
-|------|------|------------|
-| evac_zones_gis_evaczone.csv | 195 MB | 37,458 evacuation zone polygons |
-| evac_zone_status_geo_event_map.csv | 330 KB | Links evac zones to fire events. 4,429 rows |
-| evac_zones_gis_evaczonechangelog.csv | 332 MB | Full zone change history. 68,900 entries |
-| fire_perimeters_gis_fireperimeter.csv | 381 MB | 6,207 fire perimeter polygons |
-| geo_events_geoevent.csv | varies | 62,696 fire events 2021–2025 |
-| geo_events_geoeventchangelog.csv | 1.03M rows | JSON changes. Real evacuation timing source |
-| geo_events_externalgeoevent.csv | 1.5M rows | Alert channel distribution |
-| geo_events_externalgeoeventchangelog.csv | varies | Cross-references WatchDuty with CAL FIRE etc |
-| usfa-registry-national.csv | ~5 MB | ~35,000 US fire departments — copy to src/ |
+### geo_events_geoevent.csv (62,696 rows × 17 cols)
+```
+id, date_created, date_modified, geo_event_type, name, is_active, description,
+address, lat, lng, data (JSON), notification_type, external_id, external_source,
+incident_id, reporter_managed, is_visible
+```
+- `data` JSON: acreage, containment, is_prescribed, evacuation_notes, geo_event_type — mostly untapped
+- `notification_type`: silent (73%) vs normal (27%) — the core equity finding
+- `incident_id`: could link to NIFC/IRWIN for richer suppression data
+- `external_source`: wildcad, nifc, chp, pulsepoint — source diversity indicator
+
+### geo_events_externalgeoevent.csv (1.5M rows × 14 cols)
+```
+id, date_created, date_modified, data, external_id, external_source, lat, lng,
+channel, message_id, geo_event_id, user_created_id, permalink_url, is_hidden
+```
+- `channel`: regional incident channels (incidents-ca_s4, incidents-montana, etc.) — **untapped for coverage gap map**
+- `external_source`: pulsepoint (largest), wildcad, nifc, chp, spot_forecast
+- `permalink_url`: direct link to source incident page — could surface in live feed
+- `geo_event_id`: only ~5% of rows link to a specific fire event — huge unmatched signal volume
+- `message_id`: links to alert messages; untapped
+
+### evac_zones_gis_evaczone.csv (37,458 rows × 16 cols)
+```
+id, date_created, date_modified, uid_v2, is_active, display_name, region_id,
+source_attribution, dataset_name, source_extra_data, geom, status, geom_label,
+is_pending_review, pending_updates, external_status
+```
+- `external_status`: full text ("Normal", "No Order or Warning", "Lifted", "Order") — primary status field
+- `status`: plural fallback ("orders", "warnings", "advisories")
+- `is_pending_review`: bool — triage flag for data quality
+- `geom`: actual polygon WKT — enables precise overlap calculations
+- No direct state/county column — needs spatial join
+
+### evac_zone_status_geo_event_map.csv (4,429 rows × 3 cols)
+```
+date_created, uid_v2, geo_event_id
+```
+- Only 4,429 linkages for 62,696 fires — ~7% match rate; the rest of the fires have no zone link
+- Join key to evac zones from fire events
+
+### geo_events_geoeventchangelog.csv (1.03M rows × 5 cols)
+```
+id, date_created, changes (JSON), geo_event_id, user_created_id
+```
+- `changes` JSON only contains `name` key in sample — when fire names change (e.g., "Vegetation Fire" → named fire)
+- Real evacuation timing derived by parsing this changelog for evac-related status changes
+
+### evac_zones_gis_evaczonechangelog.csv (332MB × 4 cols)
+```
+id, date_created, changes (JSON), evac_zone_id
+```
+- `changes` JSON contains `geom` — zone boundary expansions/contractions over time
+- Could power a "zone expansion timeline" showing how fast fire spread widened evac boundaries
+
+### fire_perimeters_gis_fireperimeter.csv (6,207 rows × 14 cols)
+```
+id, date_created, date_modified, geo_event_id, approval_status, source,
+source_unique_id, source_date_current, source_incident_name, source_acres,
+geom, is_visible, is_historical, source_extra_data
+```
+- `source_extra_data` JSON: IncidentName, GISAcres, MapMethod, GACC, IMTName, UnitID, **IRWINID**, IncidentTypeCategory
+- `approval_status`: approved (4,139) / pending (1,185) / rejected (883) — 33.5% not approved
+- `source`: nifc (4,811), firis (481), kern_county_ca, cal_fire_intel, usfs
+
+### fire_events_with_svi_and_delays.csv (62,696 rows × 38 cols) — RICHEST DATASET
+```
+geo_event_id, date_created, geo_event_type, name, is_active, latitude, longitude,
+notification_type, fire_start, first_order_at, first_warning_at, first_advisory_at,
+max_acres, first_acres, growth_rate_acres_per_hour, n_acreage_updates,
+fire_duration_hours, final_containment_pct, last_spread_rate,
+hours_to_order, hours_to_warning, hours_to_advisory,
+evacuation_delay_hours, evacuation_occurred, exceeds_critical_threshold,
+county_fips, county_name, state, svi_score,
+svi_socioeconomic, svi_household, svi_minority, svi_housing,
+pop_age65, pop_disability, pop_poverty, pop_no_vehicle, is_vulnerable
+```
+- **Untapped:** hours_to_warning, hours_to_advisory (earlier intervention windows)
+- **Untapped:** svi_socioeconomic, svi_household, svi_minority, svi_housing (sub-themes)
+- **Untapped:** pop_age65, pop_disability, pop_poverty, pop_no_vehicle (population breakdown)
+- **Untapped:** fire_duration_hours, final_containment_pct, n_acreage_updates
+- **Untapped:** IRWINID linkage through fire_perimeters join
 
 ---
 
@@ -234,13 +382,17 @@ git checkout nadia/main -- wids-caregiver-alert/src/filename.py
 1. **geo_event_id type mismatch** — changelog stores as "22429.0", geo_events as "22429". Fix: `str(int(float(x)))` with try/except
 2. **Timezone mismatch** — geo_events date_created is timezone-naive. Fix: `.dt.tz_localize('UTC')`
 3. **fire_events_with_svi_and_delays.csv is gitignored** — use `git add -f` to force-add
-4. **usfa-registry-national.csv must be in src/** — copy from 01_raw_data/
+4. **usfa-registry-national.csv missing** — download from apps.usfa.fema.gov/registry/download, save to src/; tab shows aggregate stats until file is present
 5. **GeoJSON files too large for git** — generate locally, copy to src/, never commit
 6. **Supabase anon key must be single-line in secrets** — no line breaks
 7. **Streamlit Cloud requires "Reboot app" after secrets changes**
-8. **Only 653 fires have real evac timing** — WiDS dataset has limited formal activations. This is real, not simulated
-9. **v_dangerous_delay_candidates times out** — query joins 1.6M row table without index
-10. **fire_events Supabase columns** — last_spread_rate is TEXT (values: slow/moderate/rapid/extreme); first_order_at/first_warning_at/first_advisory_at are TEXT (timestamps as strings)
+8. **Only 653 fires have real evac timing** — WiDS dataset has limited formal activations; 99% of fires are "silent"
+9. **v_dangerous_delay_candidates times out** — query joins 1.6M row table without index; add LIMIT or index
+10. **fire_events Supabase columns** — last_spread_rate is TEXT (values: slow/moderate/rapid/extreme); first_order_at/first_warning_at/first_advisory_at are TEXT timestamps
+11. **Forgot password flow** — requires SUPABASE_URL + SUPABASE_ANON_KEY in local .streamlit/secrets.toml to test live; PBKDF2 hash/salt logic verified in standalone test (6/6 tests pass)
+12. **App run directory** — Streamlit runs from project root (`~/widsdatathon-1/`), so all relative paths in Python files use `Path("01_raw_data/...")` without `../`
+13. **growth_rate outliers** — max is 5,000,000 acres/hr (data artifact); use median not mean; `nlargest` filter recommended before display
+14. **33.5% of fire perimeters are pending/rejected** — filter to `approval_status = 'approved'` before display; this is already done in fire_perimeters_approved.geojson
 
 ---
 
@@ -248,6 +400,7 @@ git checkout nadia/main -- wids-caregiver-alert/src/filename.py
 
 **CDC SVI 2022** — 01_raw_data/external/SVI_2022_US_county.csv
 - RPL_THEMES ≥ 0.75 = high vulnerability
+- Sub-themes: RPL_THEME1 (socioeconomic), RPL_THEME2 (household), RPL_THEME3 (minority), RPL_THEME4 (housing)
 - E_AGE65, E_POV150, E_DISABL, E_NOVEH — component estimates. FIPS = join key
 
 **Census County Centroids** — wids-caregiver-alert/data/CenPop2020_Mean_CO.txt
@@ -255,11 +408,18 @@ git checkout nadia/main -- wids-caregiver-alert/src/filename.py
 
 **NASA FIRMS** — fetched at runtime, TTL=300s, no key needed
 - VIIRS: https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv
+- MODIS fallback: similar URL pattern
+
+**USFA National Fire Department Registry** — NOT yet in project
+- Download: apps.usfa.fema.gov/registry/download
+- Save as: wids-caregiver-alert/src/usfa-registry-national.csv
+- ~27,000+ registered departments; columns include fd_name, hq_city, hq_state, fd_county, dept_type, num_stations
 
 ---
 
-## Map Layers (geo_map.py)
+## Map Layers
 
+### geo_map.py (Full Folium Map — Evacuation Map page)
 | Layer | Color | Default |
 |-------|-------|---------|
 | Fire Perimeters | Red/orange | ON |
@@ -267,21 +427,56 @@ git checkout nadia/main -- wids-caregiver-alert/src/filename.py
 | Watch / Shelter | Yellow | ON |
 | Evacuation Warnings | Orange | ON |
 | Evacuation Orders | Red | ON |
-| Vulnerable Populations | Blue circles | ON |
+| Vulnerable Populations | Blue circles | OFF |
 | Live Fire Hotspots | Red circles | OFF |
+
+### command_dashboard_page.py (Plotly Hexbin Map — Command Dashboard)
+| Layer | Color | Note |
+|-------|-------|------|
+| Fire event hexagons | YlOrRd scale | 61,691 WiDS events + live NASA FIRMS, nx_hexagon=40 |
+| SVI ≥ threshold counties | Blue scatter | Threshold set by slider (default 0.75) |
+| Map style | carto-darkmatter | No Mapbox token needed |
 
 ---
 
 ## Live Incident Feed Priority (live_incident_feed.py)
-1. 🟢 Supabase geo_events_geoevent (is_active=True, up to 2,000 rows)
-2. 🟡 NASA FIRMS VIIRS (live, no key)
-3. 🟡 NASA FIRMS MODIS (fallback)
-4. ⚪ Empty DataFrame
+1. Supabase geo_events_geoevent (is_active=True, up to 2,000 rows)
+2. NASA FIRMS VIIRS (live, no key)
+3. NASA FIRMS MODIS (fallback)
+4. Empty DataFrame
 
 ---
 
 ## Signal Gap Analysis Page (signal_gap_analysis_page.py)
 - Analyst role only
 - Queries: v_dashboard_kpis, v_dangerous_delay_candidates, v_delay_summary_by_region_source
-- Falls back to hardcoded stats when Supabase returns 0s: 41,906 signals, 99.7% no action, 3.5h median delay, 100h P90
-- The fallback logic: `kpi = FALLBACK_STATS if not raw or raw.get("incidents_with_signal", 0) == 0 else raw`
+- Falls back to hardcoded VERIFIED_STATS when Supabase returns 0s:
+  - 41,906 signals, 99.7% no action, 3.5h median delay, 100h P90
+- Fallback logic: `kpi = VERIFIED_STATS if not raw or raw.get("incidents_with_signal", 0) == 0 else raw`
+
+---
+
+## Auth System (auth_supabase.py)
+
+- **Method:** Custom PBKDF2-HMAC-SHA256, 260,000 iterations, random 32-byte salt
+- **Table:** public.users (username, password_hash, password_salt, email, role, access_code)
+- **Roles:** caregiver, emergency_worker, data_analyst
+- **Forgot credentials flow:** inline panel on login page
+  - "Look up username": ilike query on email field → shows username
+  - "Reset password": generates Tmp+8 random alphanumeric, hashes, UPDATE in Supabase, displays temp pw
+- **Audit log:** user_events table (LOGIN, LOGOUT, FAILED_LOGIN, PASSWORD_RESET, ACCESS_CODE_INVALID)
+
+---
+
+## Conference Presentation Narrative
+
+**The headline:** 73% of US wildfires fire silently — no public alert ever issued. In high-SVI counties where fires grow 17% faster, this silent window is when caregivers need to act.
+
+**The gap:** Existing tools (WatchDuty, Nixle, WEA) only alert when the order is already given. There is no system that:
+  - Detects the pre-order silent window
+  - Routes alerts to caregivers of vulnerable individuals (not just direct notification)
+  - Measures and displays equity gaps in alert coverage
+
+**The proof:** 211 extreme-spread fires with no evacuation action. 41,906 fires with early signals and no response. 99.7% of fires where the alert chain never reached the public.
+
+**The solution:** Caregiver Alert System — data-driven triage → proactive SMS to caregivers → real-time evacuee tracking for dispatchers → projected 500–1,500 lives saved/year at 65% adoption.
