@@ -101,7 +101,7 @@ def render_auth_page(logo_paths=None):
                 if lp.exists():
                     _, img_col, _ = st.columns([1, 1, 1])
                     with img_col:
-                        st.image(str(lp), use_container_width=True)
+                        st.image(str(lp), width="stretch")
                     break
 
         st.markdown("<div class='auth-title'>49ers Intelligence Lab</div>", unsafe_allow_html=True)

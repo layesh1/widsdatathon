@@ -396,7 +396,7 @@ with st.sidebar:
         if lp.exists():
             _, img_col, _ = st.columns([1, 2, 1])
             with img_col:
-                st.image(str(lp), use_container_width=True)
+                st.image(str(lp), width="stretch")
             break
     else:
         st.markdown("<div style='text-align:center;font-size:0.8rem;opacity:0.5'>49ers Intelligence Lab</div>", unsafe_allow_html=True)
