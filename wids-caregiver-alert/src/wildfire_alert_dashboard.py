@@ -230,7 +230,63 @@ div[data-testid="stColumn"]:has(.ai-col-marker) {
     text-align: center; font-size: 1.05rem; font-weight: 600;
     color: #AA0000; margin: 1.2rem 0 0.8rem; letter-spacing: 0.02em;
 }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE-RESPONSIVE STYLES
+   Targets screens ≤ 768px (phones/small tablets)
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Stack multi-column layouts vertically */
+    div[data-testid="stColumns"] {
+        flex-direction: column !important;
+    }
+    div[data-testid="stColumn"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* Larger tap targets for buttons */
+    .stButton > button {
+        min-height: 48px !important;
+        font-size: 1rem !important;
+        width: 100% !important;
+    }
+
+    /* Prevent iOS input zoom (font-size must be ≥ 16px) */
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stSelectbox"] select,
+    div[data-testid="stTextArea"] textarea {
+        font-size: 16px !important;
+    }
+
+    /* Compact sidebar on mobile */
+    section[data-testid="stSidebar"] {
+        min-width: 240px !important;
+        max-width: 280px !important;
+    }
+
+    /* Slightly smaller chart heights on narrow screens */
+    div[data-testid="stPlotlyChart"] {
+        max-height: 380px;
+    }
+
+    /* Full-width metric tiles */
+    div[data-testid="metric-container"] {
+        min-width: 140px;
+    }
+}
 </style>
+""", unsafe_allow_html=True)
+
+# ── PWA / mobile-web-app meta tags ──────────────────────────────────────────
+st.markdown("""
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WiDS Wildfire Alert">
+<meta name="theme-color" content="#AA0000">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -442,6 +498,7 @@ with st.sidebar:
             "Signal Gap Analysis", "Temporal Fire Patterns",
             "Silent Fire Tracker", "Channel Coverage",
             "Hotspot Map (Gi*)", "County Drill-Down",
+            "IRWIN Linkage",
         ]
 
     if "current_page" not in st.session_state or st.session_state.current_page not in pages:
@@ -835,6 +892,10 @@ def _render_page():
     elif page == "County Drill-Down":
         from county_drilldown_page import render_county_drilldown_page
         render_county_drilldown_page()
+
+    elif page == "IRWIN Linkage":
+        from irwin_linkage_page import render_irwin_linkage_page
+        render_irwin_linkage_page()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

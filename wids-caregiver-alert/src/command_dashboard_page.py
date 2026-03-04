@@ -445,6 +445,59 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
         st.divider()
 
+        # SMS alert controls
+        from sms_alert import is_sms_available, send_evacuation_alert
+        if is_sms_available():
+            with st.expander("Send SMS Evacuation Alerts"):
+                st.markdown(
+                    "Send an SMS evacuation alert to unconfirmed residents who have a phone number on file."
+                )
+                unconf_with_phone = df[
+                    (df["status"] != "Evacuated ✅") & (df["phone"].astype(str).str.strip() != "")
+                ]
+                if unconf_with_phone.empty:
+                    st.info("No unconfirmed residents with phone numbers.")
+                else:
+                    county_alert = st.text_input(
+                        "County / Incident name for alert message",
+                        placeholder="e.g. Butte County",
+                        key="sms_county"
+                    )
+                    shelter_alert = st.text_input(
+                        "Shelter name (optional)",
+                        placeholder="e.g. Chico Event Center",
+                        key="sms_shelter"
+                    )
+                    lang_alert = st.radio("Alert language", ["English", "Spanish"],
+                                          horizontal=True, key="sms_lang")
+                    lang_code = "es" if lang_alert == "Spanish" else "en"
+                    st.caption(f"{len(unconf_with_phone)} resident(s) eligible for SMS alert")
+                    if st.button("Send Evacuation SMS to All", type="primary", key="send_sms_all"):
+                        sent, failed = 0, 0
+                        for _, r in unconf_with_phone.iterrows():
+                            ok = send_evacuation_alert(
+                                phone=str(r["phone"]),
+                                resident_name=str(r["name"]),
+                                county=county_alert or "your area",
+                                shelter_name=shelter_alert,
+                                lang=lang_code,
+                            )
+                            if ok:
+                                sent += 1
+                            else:
+                                failed += 1
+                        if sent:
+                            st.success(f"SMS sent to {sent} resident(s).")
+                        if failed:
+                            st.warning(f"{failed} message(s) failed — check phone number format.")
+        else:
+            st.caption(
+                "SMS alerts disabled. Add Twilio credentials to `.streamlit/secrets.toml` "
+                "under `[twilio]` to enable."
+            )
+
+        st.divider()
+
         # Add new resident
         with st.expander("Add resident to tracker"):
             c1, c2, c3, c4 = st.columns(4)
@@ -473,6 +526,61 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 except Exception:
                     pass
                 st.rerun()
+
+        # Bulk import from CSV
+        with st.expander("Bulk import residents from CSV"):
+            st.markdown(
+                "Upload a CSV with columns: **name**, **address**, **mobility** *(optional)*, **phone** *(optional)*"
+            )
+            uploaded_csv = st.file_uploader("Choose CSV file", type=["csv"], key="bulk_upload_csv")
+            if uploaded_csv is not None:
+                try:
+                    bulk_df = pd.read_csv(uploaded_csv)
+                    bulk_df.columns = [c.strip().lower() for c in bulk_df.columns]
+                    if not {"name", "address"}.issubset(set(bulk_df.columns)):
+                        st.error(
+                            f"CSV must have at least **name** and **address** columns. "
+                            f"Found: {list(bulk_df.columns)}"
+                        )
+                    else:
+                        if "mobility" not in bulk_df.columns:
+                            bulk_df["mobility"] = "Other"
+                        if "phone" not in bulk_df.columns:
+                            bulk_df["phone"] = ""
+                        bulk_df = bulk_df[["name", "address", "mobility", "phone"]].fillna("")
+                        bulk_df["status"] = "Unconfirmed"
+                        bulk_df["db_id"] = None
+                        st.caption(f"Preview — {len(bulk_df)} resident(s) found")
+                        st.dataframe(
+                            bulk_df[["name", "address", "mobility", "phone"]],
+                            use_container_width=True, hide_index=True
+                        )
+                        if st.button("Import all to tracker", key="confirm_bulk_import"):
+                            st.session_state.evacuee_list = pd.concat(
+                                [st.session_state.evacuee_list, bulk_df], ignore_index=True
+                            )
+                            try:
+                                from auth_supabase import get_supabase
+                                username_sb = st.session_state.get("username", "dispatcher")
+                                rows_sb = [
+                                    {
+                                        "reporter_username": username_sb,
+                                        "person_name": r["name"],
+                                        "status": "Not Evacuated",
+                                        "note": r["address"],
+                                        "updated_at": __import__("datetime").datetime.utcnow().isoformat(),
+                                    }
+                                    for _, r in bulk_df.iterrows()
+                                ]
+                                get_supabase().table("evacuation_status").upsert(
+                                    rows_sb, on_conflict="reporter_username,person_name"
+                                ).execute()
+                            except Exception:
+                                pass
+                            st.success(f"Imported {len(bulk_df)} resident(s) to tracker.")
+                            st.rerun()
+                except Exception as exc:
+                    st.error(f"Error reading CSV: {exc}")
 
         st.caption(
             "In a full deployment, this tracker would sync with the caregiver alert system — "
