@@ -13,14 +13,14 @@ What this page does:
 import streamlit as st
 import pandas as pd
 import numpy as np
-import folium
-from streamlit_folium import st_folium
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 from pathlib import Path
 
 
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
+@st.cache_data(show_spinner=False)
 def load_svi_centroids():
     """Load SVI + Census county centroids, return merged df."""
     cen_paths = [
@@ -72,6 +72,82 @@ def load_usfa():
             except Exception:
                 pass
     return None
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_geo_events():
+    """Load WiDS wildfire geo events for hexbin (lat/lng columns)."""
+    paths = [
+        Path("01_raw_data/geo_events_geoevent.csv"),
+        Path("../01_raw_data/geo_events_geoevent.csv"),
+        Path("geo_events_geoevent.csv"),
+    ]
+    for p in paths:
+        if p.exists():
+            try:
+                df = pd.read_csv(p, low_memory=False,
+                                  usecols=["lat", "lng", "geo_event_type"])
+                df = df[df["geo_event_type"] == "wildfire"].copy()
+                df = df.rename(columns={"lng": "lon"})
+                df = df[df["lat"].between(24, 50) & df["lon"].between(-125, -65)]
+                return df[["lat", "lon"]].dropna().reset_index(drop=True)
+            except Exception:
+                pass
+    return pd.DataFrame(columns=["lat", "lon"])
+
+
+# Approximate state bounding boxes [lat_min, lat_max, lon_min, lon_max]
+_STATE_BOUNDS = {
+    "CA": (32.5, 42.0, -124.4, -114.1), "OR": (42.0, 46.3, -124.6, -116.5),
+    "WA": (45.5, 49.0, -124.8, -117.0), "CO": (37.0, 41.0, -109.1, -102.0),
+    "NM": (31.3, 37.0, -109.1, -103.0), "AZ": (31.3, 37.0, -114.8, -109.1),
+    "TX": (25.8, 36.5, -106.7, -93.5),  "MT": (44.4, 49.0, -116.1, -104.0),
+    "ID": (42.0, 49.0, -117.2, -111.0), "NV": (35.0, 42.0, -120.0, -114.0),
+    "FL": (24.5, 31.0, -87.7, -80.0),   "GA": (30.4, 35.0, -85.6, -80.8),
+    "NC": (33.8, 36.6, -84.3, -75.5),   "SC": (32.0, 35.2, -83.4, -78.5),
+    "LA": (28.9, 33.0, -94.1, -88.8),
+}
+_STATE_CENTERS = {
+    "CA": (37.5, -119.5, 5), "OR": (44.0, -120.5, 6), "WA": (47.5, -120.5, 6),
+    "CO": (39.0, -105.5, 6), "NM": (34.5, -106.0, 6), "AZ": (34.0, -111.7, 6),
+    "TX": (31.0, -99.0, 5),  "MT": (47.0, -110.0, 6), "ID": (44.0, -114.0, 6),
+    "NV": (39.0, -117.0, 6), "FL": (28.0, -83.5, 6),  "GA": (32.5, -83.5, 6),
+    "NC": (35.5, -79.5, 6),  "SC": (33.8, -81.0, 6),  "LA": (31.0, -91.5, 6),
+}
+
+
+def _build_hex_data(fire_data, state_filter="All"):
+    """Merge historical WiDS geo_events + live NASA FIRMS data for hexbin."""
+    frames = []
+
+    # Historical WiDS wildfire events (62k+ points, cached)
+    geo = load_geo_events()
+    if geo is not None and len(geo) > 0:
+        frames.append(geo[["lat", "lon"]])
+
+    # Live NASA FIRMS / WiDS active data passed in from dashboard
+    if fire_data is not None and len(fire_data) > 0:
+        live = fire_data.copy()
+        lat_col = next((c for c in ["lat", "latitude"] if c in live.columns), None)
+        lon_col = next((c for c in ["lon", "lng", "longitude"] if c in live.columns), None)
+        if lat_col and lon_col:
+            sub = live[[lat_col, lon_col]].rename(columns={lat_col: "lat", lon_col: "lon"})
+            sub = sub[sub["lat"].between(24, 50) & sub["lon"].between(-125, -65)]
+            frames.append(sub)
+
+    if not frames:
+        return pd.DataFrame(columns=["lat", "lon"])
+
+    combined = pd.concat(frames, ignore_index=True).dropna()
+
+    if state_filter != "All" and state_filter in _STATE_BOUNDS:
+        lat_min, lat_max, lon_min, lon_max = _STATE_BOUNDS[state_filter]
+        combined = combined[
+            combined["lat"].between(lat_min, lat_max) &
+            combined["lon"].between(lon_min, lon_max)
+        ]
+
+    return combined.reset_index(drop=True)
 
 
 def load_geojson_layer(fname):
@@ -150,122 +226,91 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 ["All", "CA", "OR", "WA", "CO", "NM", "AZ", "TX", "MT", "ID", "NV",
                  "FL", "GA", "NC", "SC", "LA"])
         with col_ctrl2:
-            svi_threshold = st.slider("Min SVI to show (vulnerable counties)", 0.5, 1.0, 0.75, 0.05)
+            svi_threshold = st.slider("Min SVI to highlight", 0.5, 1.0, 0.75, 0.05)
         with col_ctrl3:
-            show_perimeters = st.checkbox("Show fire perimeters (GeoJSON)", value=True)
-            show_evac_zones = st.checkbox("Show evacuation zones (GeoJSON)", value=True)
-
-        # Build map centered on US
-        m = folium.Map(
-            location=[39.5, -98.5],
-            zoom_start=4,
-            tiles="CartoDB dark_matter",
-            prefer_canvas=True
-        )
-
-        # GeoJSON layers — correct path resolution
-        if show_perimeters:
-            perim_path = load_geojson_layer("fire_perimeters_approved.geojson")
-            if perim_path:
-                try:
-                    folium.GeoJson(
-                        perim_path,
-                        name="Fire Perimeters",
-                        style_function=lambda f: {
-                            "fillColor": "#FF6600", "color": "#FF4400",
-                            "weight": 1.5, "fillOpacity": 0.35
-                        },
-                        tooltip=folium.GeoJsonTooltip(fields=[], aliases=[])
-                    ).add_to(m)
-                except Exception as e:
-                    st.caption(f"Fire perimeters unavailable: {e}")
-
-        if show_evac_zones:
-            evac_path = load_geojson_layer("evac_zones_map.geojson")
-            if evac_path:
-                try:
-                    folium.GeoJson(
-                        evac_path,
-                        name="Evacuation Zones",
-                        style_function=lambda f: {
-                            "fillColor": "#FF4444",
-                            "color": "#CC0000",
-                            "weight": 1,
-                            "fillOpacity": 0.25
-                        }
-                    ).add_to(m)
-                except Exception as e:
-                    st.caption(f"Evac zones unavailable: {e}")
-
-        # Live fire hotspots
-        n_plotted = 0
-        if fire_source != "none" and len(fire_data) > 0:
-            plot_df = fire_data.copy()
-            if state_filter != "All" and "state" in plot_df.columns:
-                plot_df = plot_df[plot_df["state"] == state_filter]
-
-            for _, row in plot_df.head(500).iterrows():
-                try:
-                    conf = row.get("confidence", "")
-                    is_high = (str(conf).lower() in ["h", "high", "n", "nominal"] or
-                               (str(conf).isdigit() and int(conf) >= 80))
-                    color = "#FF2200" if is_high else "#FF8800"
-                    folium.CircleMarker(
-                        location=[float(row["lat"]), float(row["lon"])],
-                        radius=5 if is_high else 3,
-                        color=color, fill=True, fill_color=color,
-                        fill_opacity=0.75,
-                        tooltip=f"Fire hotspot | Conf: {conf}"
-                    ).add_to(m)
-                    n_plotted += 1
-                except Exception:
-                    pass
-
-        # Vulnerable county centroids
-        svi_df = load_svi_centroids()
-        if svi_df is not None:
-            filtered_svi = svi_df[svi_df["RPL_THEMES"] >= svi_threshold]
-            if state_filter != "All" and "ST_ABBR" in filtered_svi.columns:
-                filtered_svi = filtered_svi[filtered_svi["ST_ABBR"] == state_filter]
-            for _, row in filtered_svi.nlargest(300, "RPL_THEMES").iterrows():
-                try:
-                    folium.CircleMarker(
-                        location=[row["LATITUDE"], row["LONGITUDE"]],
-                        radius=7,
-                        color="#4a90d9", fill=True, fill_color="#4a90d9",
-                        fill_opacity=0.35,
-                        tooltip=f"{row.get('COUNTY','County')}, {row.get('ST_ABBR','')} — SVI {row['RPL_THEMES']:.2f}"
-                    ).add_to(m)
-                except Exception:
-                    pass
-
-        folium.LayerControl().add_to(m)
-
-        # Legend
-        legend_html = """
-        <div style="position:fixed;bottom:30px;left:30px;z-index:1000;background:#111;
-                    padding:10px 14px;border-radius:8px;font-size:12px;color:white;border:1px solid #333;">
-            <b>Legend</b><br>
-            <span style="color:#FF2200">●</span> High-confidence fire hotspot<br>
-            <span style="color:#FF8800">●</span> Moderate fire hotspot<br>
-            <span style="color:#4a90d9">●</span> Vulnerable county (SVI ≥ threshold)<br>
-            <span style="color:#FF6600">▬</span> Fire perimeter<br>
-            <span style="color:#FF4444">▬</span> Evacuation zone
-        </div>
-        """
-        m.get_root().html.add_child(folium.Element(legend_html))
-
-        map_result = st_folium(m, width="100%", height=560, returned_objects=["last_clicked"])
-
-        # Status line
-        if fire_source != "none":
             st.caption(
-                f"{fire_label} · {n_plotted} hotspots plotted · "
-                f"Blue = SVI ≥ {svi_threshold} counties · "
-                "GeoJSON layers load from local src/ directory"
+                "Hexagon density map — each cell aggregates nearby fire events. "
+                "Blue circles = high-SVI counties.  \n"
+                "Full GeoJSON overlays (perimeters, evac zones): see **Evacuation Map** page."
+            )
+
+        # Build combined fire dataset: WiDS historical + live NASA FIRMS
+        hex_df = _build_hex_data(fire_data, state_filter)
+        svi_df = load_svi_centroids()
+
+        if len(hex_df) >= 5:
+            hex_fig = ff.create_hexbin_mapbox(
+                data_frame=hex_df,
+                lat="lat",
+                lon="lon",
+                nx_hexagon=40,
+                opacity=0.72,
+                labels={"color": "Fire Events"},
+                show_original_data=False,
+                color_continuous_scale="YlOrRd",
+                min_count=1,
             )
         else:
-            st.caption("No live fire data. Map shows vulnerable county locations only.")
+            # Sparse / no data — plain scatter fallback
+            hex_fig = go.Figure(go.Scattermapbox(
+                lat=hex_df["lat"].tolist() if len(hex_df) else [39.5],
+                lon=hex_df["lon"].tolist() if len(hex_df) else [-98.5],
+                mode="markers",
+                marker=dict(size=6, color="#FF2200", opacity=0.75),
+                name="Fire Hotspots",
+            ))
+
+        # Overlay vulnerable county centroids
+        if svi_df is not None:
+            fsvi = svi_df[svi_df["RPL_THEMES"] >= svi_threshold].copy()
+            if state_filter != "All" and "ST_ABBR" in fsvi.columns:
+                fsvi = fsvi[fsvi["ST_ABBR"] == state_filter]
+            if len(fsvi) > 0:
+                hex_fig.add_trace(go.Scattermapbox(
+                    lat=fsvi["LATITUDE"].tolist(),
+                    lon=fsvi["LONGITUDE"].tolist(),
+                    mode="markers",
+                    marker=dict(size=9, color="#4a90d9", opacity=0.5),
+                    name=f"SVI \u2265 {svi_threshold}",
+                    text=[
+                        f"{r.get('COUNTY', '')}, {r.get('ST_ABBR', '')} \u2014 SVI {r['RPL_THEMES']:.2f}"
+                        for _, r in fsvi.iterrows()
+                    ],
+                    hoverinfo="text",
+                ))
+
+        # Map center / zoom by state filter
+        clat, clon, czoom = _STATE_CENTERS.get(state_filter, (39.5, -98.5, 3))
+
+        hex_fig.update_layout(
+            mapbox=dict(
+                style="carto-darkmatter",
+                center=dict(lat=clat, lon=clon),
+                zoom=czoom,
+            ),
+            height=560,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="#0f0f1a",
+            legend=dict(
+                bgcolor="rgba(20,20,30,0.85)",
+                bordercolor="#444",
+                borderwidth=1,
+                font=dict(color="#eee"),
+                x=0, y=1,
+            ),
+            coloraxis_colorbar=dict(
+                title="Fire<br>Events",
+                tickfont=dict(color="#eee"),
+                titlefont=dict(color="#eee"),
+                thickness=14,
+            ),
+        )
+
+        st.plotly_chart(hex_fig, use_container_width=True)
+        st.caption(
+            f"{len(hex_df):,} fire events  ·  {fire_label} + WiDS 2021–2025 historical data  ·  "
+            f"Blue circles = SVI \u2265 {svi_threshold} counties"
+        )
 
     # ════════ TAB 2: EVACUEE STATUS TRACKER ══════════════════════════════════
     with tab_evacuees:
@@ -380,7 +425,33 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
         usfa_df = load_usfa()
         if usfa_df is None:
-            st.error("usfa-registry-national.csv not found. Copy it to src/ directory.")
+            st.info(
+                "**USFA National Fire Department Registry not loaded.**\n\n"
+                "To enable this tab: download the registry CSV from "
+                "[apps.usfa.fema.gov/registry/download](https://apps.usfa.fema.gov/registry/download) "
+                "and save it as `usfa-registry-national.csv` in the `src/` directory."
+            )
+            # Show summary statistics from USFA quick facts
+            st.subheader("USFA Registry — Known Aggregate Statistics")
+            u1, u2, u3, u4 = st.columns(4)
+            u1.metric("Registered Departments", "27,000+", help="Source: USFA Quick Facts")
+            u2.metric("Career Dept Share", "~6%", help="Majority are volunteer")
+            u3.metric("Volunteer Dept Share", "~69%", help="USFA 2023 estimate")
+            u4.metric("Combination Dept Share", "~25%", help="Career + volunteer mix")
+
+            st.markdown("""
+            **Top fire-prone states by department count (USFA estimates):**
+
+            | State | Est. Departments |
+            |-------|-----------------|
+            | Texas | 1,800+ |
+            | Pennsylvania | 1,700+ |
+            | New York | 1,600+ |
+            | Ohio | 1,500+ |
+            | California | 1,000+ |
+
+            Download the full registry CSV to enable filtering, mapping, and county-level resource analysis.
+            """)
             return
 
         usfa_df.columns = [c.lower().strip() for c in usfa_df.columns]
