@@ -47,15 +47,15 @@ def load_fire_data():
 
 
 def render_real_data_insights():
-    st.subheader("📊 Core Findings — WiDS 2021–2025 Real Data")
+    st.subheader("Core Findings — WiDS 2021–2025 Real Data")
 
     df = load_fire_data()
     has_real = df is not None
 
     if has_real:
-        st.success(f"✅ Loaded `fire_events_with_svi_and_delays.csv` — {len(df):,} fire events")
+        st.success(f"Loaded `fire_events_with_svi_and_delays.csv` — {len(df):,} fire events")
     else:
-        st.info("📂 `fire_events_with_svi_and_delays.csv` not in current directory. "
+        st.info("`fire_events_with_svi_and_delays.csv` not in current directory. "
                 "Showing verified aggregate statistics from dataset analysis.")
 
     # ── Year-over-year fire growth ────────────────────────────────────────────
@@ -108,7 +108,7 @@ def render_real_data_insights():
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown("#### ⏱️ Time to Evacuation Order — 653 Real Fires")
+        st.markdown("#### Time to Evacuation Order — 653 Real Fires")
         st.caption("X-axis capped at 50h. 10% of fires exceed this (max ~700h — major disasters).")
 
         if has_real and "hours_to_order" in df.columns:
@@ -157,7 +157,7 @@ def render_real_data_insights():
             # Outlier note
             pct_over_50 = (delays > 50).mean() * 100
             st.caption(
-                f"⚠️ {pct_over_50:.0f}% of fires exceed 50h (hidden from chart) — "
+                f"{pct_over_50:.0f}% of fires exceed 50h (hidden from chart) — "
                 "these are major multi-day incidents where vulnerable populations face "
                 "prolonged displacement. The median (1.1h) is driven by rapid-response fires."
             )
@@ -191,7 +191,7 @@ def render_real_data_insights():
             st.caption("Simulated from verified statistics. Load `fire_events_with_svi_and_delays.csv` for real distribution.")
 
     with col_right:
-        st.markdown("#### 🔥 Fire Growth Rate by Vulnerability")
+        st.markdown("#### Fire Growth Rate by Vulnerability")
         st.caption("High-SVI counties face faster-growing fires — less real response time despite similar order timing.")
 
         # Growth rate comparison — real numbers
@@ -236,9 +236,9 @@ def render_real_data_insights():
     st.divider()
 
     # ── Row 3: Alert system impact (clearly labeled as modeled) ──────────────
-    st.markdown("#### 📡 Modeled Impact: Caregiver Alert System")
+    st.markdown("#### Modeled Impact: Caregiver Alert System")
     st.caption(
-        "⚠️ The chart below shows a **modeled scenario**, not observed data. "
+        "The chart below shows a **modeled scenario**, not observed data. "
         "It projects how a caregiver alert (0.85h lead time, per FEMA 2019 IPAWS study) "
         "would shift the evacuation departure distribution for vulnerable populations."
     )
@@ -301,7 +301,7 @@ def render_real_data_insights():
     st.divider()
 
     # ── Row 4: SVI component breakdown ───────────────────────────────────────
-    st.markdown("#### 🧩 What Drives Vulnerability in Fire-Affected Counties")
+    st.markdown("#### What Drives Vulnerability in Fire-Affected Counties")
 
     if has_real:
         svi_cols = {
@@ -350,7 +350,7 @@ def render_real_data_insights():
         st.caption("CDC SVI 2022 averages for fire-affected counties in WiDS dataset.")
 
     # ── Row 5: Geographic table ───────────────────────────────────────────────
-    st.markdown("#### 📍 Top High-SVI Counties in Fire Zones")
+    st.markdown("#### Top High-SVI Counties in Fire Zones")
 
     if has_real and "RPL_THEMES" in df.columns:
         top_counties = df.nlargest(15, "RPL_THEMES")[
@@ -373,7 +373,7 @@ def render_real_data_insights():
 
     # ── Row 6: Silent→Normal escalation timeline ─────────────────────────────
     st.divider()
-    st.subheader("🔺 Fire Escalation: Silent → Active Notification")
+    st.subheader("Fire Escalation: Silent → Active Notification")
     st.markdown("""
     The WiDS dataset records when a fire's `notification_type` changed from **silent**
     (background monitoring) to **normal** (public-facing alert). This escalation event marks

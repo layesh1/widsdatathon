@@ -99,12 +99,12 @@ def haversine_km(lat1, lon1, lat2, lon2):
 
 
 def render_caregiver_start_page():
-    st.title("🏠 Wildfire Evacuation Decision Support")
+    st.title("Wildfire Evacuation Decision Support")
     st.subheader("Know Your Risk. Act Early. Get Help.")
 
     # ── Real data warning banner ──────────────────────────────────────────────
     st.info(
-        "⚠️ In high-vulnerability counties, fires grow at **11.7 acres/hour** — "
+        "In high-vulnerability counties, fires grow at **11.7 acres/hour** — "
         "+17% faster than lower-risk areas. The median time to an official evacuation "
         "order is **1.1 hours**. Don't wait.",
         icon="⚠️"
@@ -113,7 +113,7 @@ def render_caregiver_start_page():
     st.divider()
 
     # ── Address input ─────────────────────────────────────────────────────────
-    st.subheader("📍 Enter Your Location")
+    st.subheader("Enter Your Location")
     col_addr, col_radius = st.columns([3, 1])
     with col_addr:
         address_input = st.text_input(
@@ -125,7 +125,7 @@ def render_caregiver_start_page():
         search_radius = st.selectbox("Search radius", [10, 25, 50, 100], index=1,
                                       format_func=lambda x: f"{x} miles")
 
-    check_btn = st.button("🔍 Check Fire Risk Near Me", type="primary",
+    check_btn = st.button("Check Fire Risk Near Me", type="primary",
                            disabled=(not address_input))
 
     if check_btn and address_input:
@@ -136,7 +136,7 @@ def render_caregiver_start_page():
             st.error("Couldn't find that address. Try a more specific address or include city and state.")
             return
 
-        st.success(f"📍 Found: {display_name}")
+        st.success(f"Found: {display_name}")
         st.session_state["user_lat"]   = user_lat
         st.session_state["user_lon"]   = user_lon
         st.session_state["user_addr"]  = display_name
@@ -169,13 +169,13 @@ def render_caregiver_start_page():
         # Fire status banner
         if not firms_ok:
             st.warning(
-                "🟡 NASA FIRMS data unavailable right now. "
+                "NASA FIRMS data unavailable right now. "
                 "Check [Ready.gov](https://www.ready.gov) or "
                 "[CAL FIRE](https://www.fire.ca.gov/incidents/) for current evacuation orders."
             )
         elif len(nearby) == 0:
             st.success(
-                f"✅ No active fire hotspots detected within {search_radius} miles of your location "
+                f"No active fire hotspots detected within {search_radius} miles of your location "
                 f"in the last 24 hours (NASA FIRMS VIIRS satellite data)."
             )
         else:
@@ -185,19 +185,19 @@ def render_caregiver_start_page():
 
             if closest_mi < 5:
                 st.error(
-                    f"🔴 **IMMEDIATE DANGER** — {n_fires} active fire hotspot(s) detected, "
+                    f"**IMMEDIATE DANGER** — {n_fires} active fire hotspot(s) detected, "
                     f"closest is **{closest_mi:.1f} miles** away. "
                     "**Evacuate now if under order. Don't wait for official notice.**"
                 )
             elif closest_mi < 20:
                 st.warning(
-                    f"🟠 **Fire activity detected {closest_mi:.1f} miles away** — "
+                    f"**Fire activity detected {closest_mi:.1f} miles away** — "
                     f"{n_fires} hotspot(s) within {search_radius} miles. "
                     "Monitor conditions and be ready to evacuate immediately."
                 )
             else:
                 st.info(
-                    f"🟡 Fire activity detected, but closest hotspot is {closest_mi:.1f} miles away. "
+                    f"Fire activity detected, but closest hotspot is {closest_mi:.1f} miles away. "
                     "Monitor conditions."
                 )
 
@@ -219,7 +219,7 @@ def render_caregiver_start_page():
                         location=[row["lat"], row["lon"]],
                         radius=6,
                         color="#FF2200", fill=True, fill_color="#FF2200", fill_opacity=0.7,
-                        tooltip=f"🔥 Fire — {row['dist_km']:.1f} km away"
+                        tooltip=f"Fire — {row['dist_km']:.1f} km away"
                     ).add_to(m)
                 except Exception:
                     pass
@@ -254,7 +254,7 @@ def render_caregiver_start_page():
         st_folium(m, width="100%", height=420, returned_objects=[])
 
         # Shelter table
-        st.subheader("🏥 Open Shelters Near You")
+        st.subheader("Open Shelters Near You")
         if shelter_found:
             display_cols = [c for c in ["SHELTER_NAME", "ADDRESS", "CITY", "STATE",
                                          "CAPACITY", "PHONE"] if c in shelters.columns]
@@ -273,7 +273,7 @@ def render_caregiver_start_page():
         st.divider()
 
         # Caregiver confirmation
-        st.subheader("✅ Confirm Evacuation Status")
+        st.subheader("Confirm Evacuation Status")
         st.markdown(
             "If you are a caregiver and your person has evacuated, confirm here. "
             "This updates the dispatcher's tracker so emergency workers know who still needs help."
@@ -283,18 +283,18 @@ def render_caregiver_start_page():
             confirm_addr = st.text_input("Resident address",
                                           value=st.session_state.get("user_addr", ""))
             confirm_dest = st.text_input("Evacuated to (shelter name or address)")
-            submitted = st.form_submit_button("✅ Confirm Evacuated")
+            submitted = st.form_submit_button("Confirm Evacuated")
             if submitted and confirm_name:
                 if "evacuee_list" in st.session_state:
                     # Update dispatcher tracker if name matches
                     mask = st.session_state.evacuee_list["name"].str.lower() == confirm_name.lower()
                     if mask.any():
                         st.session_state.evacuee_list.loc[mask, "status"] = "Evacuated ✅"
-                        st.success(f"✅ {confirm_name} marked as evacuated. Dispatcher notified.")
+                        st.success(f"{confirm_name} marked as evacuated. Dispatcher notified.")
                     else:
-                        st.success(f"✅ Evacuation confirmed for {confirm_name}. Thank you.")
+                        st.success(f"Evacuation confirmed for {confirm_name}. Thank you.")
                 else:
-                    st.success(f"✅ Evacuation confirmed for {confirm_name}. Thank you.")
+                    st.success(f"Evacuation confirmed for {confirm_name}. Thank you.")
 
     st.divider()
 

@@ -113,9 +113,9 @@ def render_signal_gap_analysis():
     kpi, danger_df, delay_df, live = load_gap_data()
 
     if live:
-        st.caption("🟢 Live data from Supabase")
+        st.caption("Live data from Supabase")
     else:
-        st.caption("⚪ Supabase unavailable — showing verified statistics from full 1.6M row dataset")
+        st.caption("Supabase unavailable — showing verified statistics from full 1.6M row dataset")
 
     # ── KPI Row ───────────────────────────────────────────────────────────────
     st.divider()
@@ -315,7 +315,7 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
 
     # ── Key takeaway ─────────────────────────────────────────────────────────
     st.divider()
-    st.subheader("📌 Key Takeaway for Caregiver Alert System")
+    st.subheader("Key Takeaway for Caregiver Alert System")
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric("Fires with No Action", f"{pct_missing*100:.1f}%",

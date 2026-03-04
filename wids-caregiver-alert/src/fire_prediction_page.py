@@ -156,7 +156,7 @@ def render_fire_prediction_page(role="analyst"):
     st.title("Fire Predictor")
     st.caption("Forward-looking fire predictions · Historical shape statistics · Escalation classification")
 
-    tab1, tab2 = st.tabs(["🗺️ Future Hotspot Forecast", "🔬 Fire Analysis (Known Fire)"])
+    tab1, tab2 = st.tabs(["Future Hotspot Forecast", "Fire Analysis (Known Fire)"])
 
     # ════════════════════════════════════════════════════════════════════════
     # TAB 1: FORWARD-LOOKING HOTSPOT PREDICTION — no input required
@@ -173,7 +173,7 @@ def render_fire_prediction_page(role="analyst"):
 
         col_meta1, col_meta2, col_meta3 = st.columns(3)
         with col_meta1:
-            src_label = "🟡 NASA FIRMS (Live)" if firms_src == "live" else "⚪ Historical patterns only"
+            src_label = "NASA FIRMS (Live)" if firms_src == "live" else "Historical patterns only"
             st.caption(f"Live data source: {src_label}")
         with col_meta2:
             if firms_df is not None:
@@ -207,7 +207,7 @@ def render_fire_prediction_page(role="analyst"):
 
         hotspot_df["risk_pct"] = (hotspot_df["risk"] * 100).round(1)
         hotspot_df["priority"] = hotspot_df["risk"].apply(
-            lambda r: "🔴 Critical" if r >= 0.85 else ("🟠 High" if r >= 0.70 else "🟡 Moderate")
+            lambda r: "Critical" if r >= 0.85 else ("High" if r >= 0.70 else "Moderate")
         )
         hotspot_df["vul_label"] = hotspot_df["vul_svi"].apply(
             lambda s: "Very High" if s >= 0.75 else ("High" if s >= 0.5 else "Moderate")
@@ -287,7 +287,7 @@ def render_fire_prediction_page(role="analyst"):
         st.divider()
 
         # Growth curve forecast for top zone
-        st.subheader("📈 Predicted Growth Curves — Top 3 Zones")
+        st.subheader("Predicted Growth Curves — Top 3 Zones")
         top3 = hotspot_df.nlargest(3, "risk")
         hours = [0, 1, 3, 6, 12, 24, 48, 72]
 
@@ -339,7 +339,7 @@ def render_fire_prediction_page(role="analyst"):
             terrain_rough   = st.slider("Terrain roughness (0=flat, 5=rugged)", 0, 5, 2)
             vul_svi         = st.slider("Nearest county SVI", 0.0, 1.0, 0.5, step=0.01)
 
-        if st.button("🔮 Run Prediction", type="primary"):
+        if st.button("Run Prediction", type="primary"):
             hours_forecast = [1, 3, 6, 12, 24, 48, 72]
             sizes = predict_fire_size(initial_acres, veg_type, wind_mph, slope_pct, humidity_pct, hours_forecast)
             shape = predict_fire_shape(initial_acres, wind_mph, terrain_rough)
@@ -356,11 +356,11 @@ def render_fire_prediction_page(role="analyst"):
 
             # Escalation alert
             if escalation_prob >= 0.75:
-                st.error(f"🔴 **HIGH ESCALATION RISK** — {escalation_prob*100:.0f}% probability of rapid growth (>100 ac/hr)")
+                st.error(f"**HIGH ESCALATION RISK** — {escalation_prob*100:.0f}% probability of rapid growth (>100 ac/hr)")
             elif escalation_prob >= 0.5:
-                st.warning(f"🟠 **MODERATE ESCALATION RISK** — {escalation_prob*100:.0f}% probability of significant growth")
+                st.warning(f"**MODERATE ESCALATION RISK** — {escalation_prob*100:.0f}% probability of significant growth")
             else:
-                st.success(f"🟡 **LOW-MODERATE RISK** — {escalation_prob*100:.0f}% escalation probability")
+                st.success(f"**LOW-MODERATE RISK** — {escalation_prob*100:.0f}% escalation probability")
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Size at 6h", f"{sizes[2]:,.0f} ac", delta=f"+{sizes[2]-initial_acres:,.0f} ac")

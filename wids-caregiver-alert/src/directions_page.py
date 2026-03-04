@@ -1327,7 +1327,7 @@ def render_directions_page(fire_data, vulnerable_populations):
 
             # ── Step list ──
             for leg in plan["legs"]:
-                icon = {"car": "🚗", "walk": "🚶", "ride": "🚌", "coach": "🚌"}.get(leg["mode"], "•")
+                icon = {"car": "[drive]", "walk": "[walk]", "ride": "[transit]", "coach": "[transit]"}.get(leg["mode"], "•")
                 st.caption(f"{icon}  {leg['label']}  —  {_fmt(leg['duration_min'])}  ({leg['dist_mi']} mi)")
 
             # Intercity coach booking links

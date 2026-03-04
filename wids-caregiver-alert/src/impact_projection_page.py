@@ -49,11 +49,11 @@ def load_real_data():
 
 
 def render_impact_projection_page():
-    st.title("📊 Impact Projection")
+    st.title("Impact Projection")
     st.caption("All projections are anchored to real WiDS 2021–2025 baseline data and published evacuation mortality literature.")
 
     # ── Data source disclosure ──
-    with st.expander("📂 Data sources & methodology", expanded=False):
+    with st.expander("Data sources & methodology", expanded=False):
         st.markdown("""
         **Baseline statistics** come directly from `fire_events_with_svi_and_delays.csv` (653 fires with confirmed evacuation actions, 2021–2025 WiDS dataset).
 
@@ -262,6 +262,6 @@ def render_impact_projection_page():
         st.plotly_chart(fig3, use_container_width=True)
 
     st.caption(
-        "⚠️ Projection model uses empirical baselines. Lives-saved estimates are scenario projections, "
+        "Projection model uses empirical baselines. Lives-saved estimates are scenario projections, "
         "not guarantees. See methodology above for all sources."
     )

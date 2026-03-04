@@ -147,7 +147,7 @@ def render_alert_channel_equity_page():
         unsafe_allow_html=True,
     )
 
-    st.markdown('<p class="eq-header">📣 Alert Channel Equity Analysis</p>', unsafe_allow_html=True)
+    st.markdown('<p class="eq-header">Alert Channel Equity Analysis</p>', unsafe_allow_html=True)
     st.markdown(
         '<p class="eq-sub">Who gets automated alerts — and who is left waiting for manual outreach? '
         'Channel coverage gaps by Social Vulnerability Index.</p>',
@@ -362,7 +362,7 @@ def render_alert_channel_equity_page():
     st.markdown("---")
 
     # ── Row 4: Integration pathway ────────────────────────────────────────────
-    st.subheader("🔗 Integration: Channel Equity → Caregiver Alert Triage")
+    st.subheader("Integration: Channel Equity → Caregiver Alert Triage")
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(

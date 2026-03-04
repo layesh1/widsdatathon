@@ -45,7 +45,7 @@ def load_fire_data():
                     active = df[df.get("is_active", pd.Series(dtype=bool)) == True].copy()
                     if len(active) > 0:
                         active["source"] = "wids"
-                        return active, "wids", "🟢 WiDS Geo Events (Local)"
+                        return active, "wids", "WiDS Geo Events (Local)"
             except Exception:
                 pass
 
@@ -68,14 +68,14 @@ def load_fire_data():
             df = df[(df["lat"].between(24, 72)) & (df["lon"].between(-180, -65))]
             if len(df) > 0:
                 df["source"] = "wids"
-                return df, "wids", f"🟢 WiDS Geo Events (Supabase · {len(df):,} active)"
+                return df, "wids", f"WiDS Geo Events (Supabase · {len(df):,} active)"
     except Exception:
         pass
 
     # 2. NASA FIRMS VIIRS (no key)
     for url, key, label in [
-        (FIRMS_VIIRS, "firms_viirs", "🟡 NASA FIRMS VIIRS (Live)"),
-        (FIRMS_MODIS, "firms_modis", "🟡 NASA FIRMS MODIS (Live)"),
+        (FIRMS_VIIRS, "firms_viirs", "NASA FIRMS VIIRS (Live)"),
+        (FIRMS_MODIS, "firms_modis", "NASA FIRMS MODIS (Live)"),
     ]:
         try:
             r = requests.get(url, timeout=12)
@@ -101,7 +101,7 @@ def load_fire_data():
             continue
 
     # 3. No data
-    return pd.DataFrame(), "none", "⚪ No live fire data available"
+    return pd.DataFrame(), "none", "No live fire data available"
 
 
 def get_fire_summary(df, source):

@@ -84,10 +84,10 @@ KNOWN_OTHER_SRC  = 0.29
 
 
 def render_coverage_analysis_page():
-    st.title("📡 Coverage Analysis")
+    st.title("Coverage Analysis")
     st.caption("Agency Coverage Gap · Alert Channel Equity — WiDS 2021–2025 data")
 
-    tab1, tab2, tab3 = st.tabs(["🏛️ Agency Coverage Gaps", "📢 Alert Channel Equity", "🔍 Combined Risk Index"])
+    tab1, tab2, tab3 = st.tabs(["Agency Coverage Gaps", "Alert Channel Equity", "Combined Risk Index"])
 
     # ── TAB 1: Agency Coverage ────────────────────────────────────────────────
     with tab1:
@@ -121,7 +121,7 @@ def render_coverage_analysis_page():
                 st.plotly_chart(fig, use_container_width=True)
         else:
             # Show known stats from context doc as static chart
-            st.info("📂 Full data not deployed to cloud. Showing known aggregate statistics from dataset analysis.")
+            st.info("Full data not deployed to cloud. Showing known aggregate statistics from dataset analysis.")
             sources = ["WildCAD", "Null / Unknown", "Other Sources"]
             pcts    = [37, 34, 29]
             fig = go.Figure(go.Bar(
@@ -196,7 +196,7 @@ def render_coverage_analysis_page():
             fig3.update_layout(template="plotly_dark", height=320)
             st.plotly_chart(fig3, use_container_width=True)
         else:
-            st.info("📂 Full data not deployed to cloud. Showing known aggregate statistics.")
+            st.info("Full data not deployed to cloud. Showing known aggregate statistics.")
 
             # Verified breakdown — computed from geo_events_externalgeoevent.csv (1,502,495 signals)
             channels    = ["bots-extra-alerts (Auto)", "bots-alertwest-ai (Auto)", "Geographic / Other"]
@@ -224,9 +224,9 @@ def render_coverage_analysis_page():
         with col_a:
             st.markdown("""
             **Estimated alert lag by channel type:**
-            - 🤖 Automated bot alert: **~2 min** after trigger
-            - 📞 Manual dispatch: **~18–45 min** after trigger
-            - ⚠️ Official evacuation order: **1.1h median** (real WiDS data)
+            - Automated bot alert: **~2 min** after trigger
+            - Manual dispatch: **~18–45 min** after trigger
+            - Official evacuation order: **1.1h median** (real WiDS data)
 
             In high-SVI counties where fires grow **17% faster**, a 30-minute manual dispatch
             delay equals ~5.9 additional acres burned before residents are notified.
@@ -340,7 +340,7 @@ def render_coverage_analysis_page():
         st.plotly_chart(fig6, use_container_width=True)
 
         st.caption(
-            "⚠️ State-level index uses real SVI and WiDS fire distribution data combined with "
+            "State-level index uses real SVI and WiDS fire distribution data combined with "
             "estimated channel mix ratios. County-level granularity requires deploying full "
             "geo_events_externalgeoevent.csv to the cloud instance."
         )

@@ -46,7 +46,7 @@ try:
 except:
     # Fallback: create simple analytics placeholder
     def render_analytics_dashboard():
-        st.title("📊 Research & Analytics Dashboard")
+        st.title("Research & Analytics Dashboard")
         st.info("Full analytics dashboard loading...")
         st.markdown("""
         **Available Analyses:**
@@ -119,7 +119,7 @@ elif st.session_state.user_role == "evacuee_caregiver":
         
         # Import and run the full dashboard
         # (This would be the caregiver_dashboard_FINAL.py content)
-        st.title("👨‍👩‍👧‍👦 Evacuation & Caregiver Dashboard")
+        st.title("Evacuation & Caregiver Dashboard")
         st.info("Loading full evacuation planning interface...")
         
         # Merge territories into vulnerable populations
@@ -135,7 +135,7 @@ elif st.session_state.user_role == "evacuee_caregiver":
             st.session_state.user_role = None
             st.rerun()
         
-        st.title("👨‍👩‍👧‍👦 Evacuation Planning Dashboard")
+        st.title("Evacuation Planning Dashboard")
         st.markdown("### Find Safe Routes & Shelters")
         
         st.info("""
@@ -179,7 +179,7 @@ elif st.session_state.user_role == "data_analyst":
     if ANALYTICS_AVAILABLE:
         render_analytics_dashboard()
     else:
-        st.title("📊 Research & Analytics Dashboard")
+        st.title("Research & Analytics Dashboard")
         
         st.markdown("""
         ### Evacuation Equity Research Platform

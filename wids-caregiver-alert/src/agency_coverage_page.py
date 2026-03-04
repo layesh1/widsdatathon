@@ -143,7 +143,7 @@ def render_agency_coverage_page():
         unsafe_allow_html=True,
     )
 
-    st.markdown('<p class="cover-header">📡 Agency Coverage Gap Analysis</p>', unsafe_allow_html=True)
+    st.markdown('<p class="cover-header">Agency Coverage Gap Analysis</p>', unsafe_allow_html=True)
     st.markdown(
         '<p class="cover-sub">How many agencies report each fire — and where do coverage gaps leave '
         'vulnerable populations exposed?</p>',
@@ -289,7 +289,7 @@ def render_agency_coverage_page():
     )
     fig_bubble.add_annotation(
         x=0.875, y=70,
-        text="⚠️ High Risk Zone",
+        text="High Risk Zone",
         showarrow=False,
         font=dict(color=COLORS["fire"], size=11),
     )
@@ -377,7 +377,7 @@ def render_agency_coverage_page():
     st.markdown("---")
 
     # ── Row 4: Methodology note + recommendation ──────────────────────────────
-    st.subheader("📋 Methodology & Policy Recommendations")
+    st.subheader("Methodology & Policy Recommendations")
     m1, m2 = st.columns(2)
     with m1:
         st.markdown(

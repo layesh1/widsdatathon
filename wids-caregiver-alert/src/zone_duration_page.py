@@ -107,7 +107,7 @@ SYNTHETIC_DURATIONS = {
 
 
 def render_zone_duration_page():
-    st.title("⏱️ Zone Duration Analysis")
+    st.title("Zone Duration Analysis")
     st.caption("How long do evacuation zones stay active? — WiDS 2021–2025 zone change history")
 
     st.markdown("""
@@ -122,7 +122,7 @@ def render_zone_duration_page():
     zone_df = load_evac_zones()
 
     if real_data and changelog_df is not None:
-        st.success(f"✅ Loaded changelog data: {len(changelog_df):,} rows")
+        st.success(f"Loaded changelog data: {len(changelog_df):,} rows")
 
         durations_df = compute_zone_durations(changelog_df, zone_df)
 
@@ -133,7 +133,7 @@ def render_zone_duration_page():
             render_known_stats()
     else:
         st.info(
-            "📂 `evac_zones_gis_evaczonechangelog.csv` not deployed to Streamlit Cloud (332 MB). "
+            "`evac_zones_gis_evaczonechangelog.csv` not deployed to Streamlit Cloud (332 MB). "
             "Showing analysis from local dataset run. To see full live analysis, run locally."
         )
         render_known_stats()
@@ -250,7 +250,7 @@ def render_known_stats():
     st.divider()
 
     # Key finding callout
-    st.subheader("📌 Key Finding")
+    st.subheader("Key Finding")
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Median Fire Growth Rate", "2.5 ac/h",

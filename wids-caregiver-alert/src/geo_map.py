@@ -322,7 +322,7 @@ def render_map_with_controls(vulnerable_populations, fire_data, height=550):
                        f"{non_normal:,} active  ·  "
                        f"Data: Genasys Protect / WiDS 2025")
         else:
-            st.caption("⚠️ GeoJSON not found — copy evac_zones_map.geojson to src/")
+            st.caption("GeoJSON not found — copy evac_zones_map.geojson to src/")
 
     if not evac_data and not load_fire_perimeters():
         st.warning(
@@ -332,7 +332,7 @@ def render_map_with_controls(vulnerable_populations, fire_data, height=550):
         )
 
     # Cache-clear button (safe here, inside a function)
-    if st.button("🔄 Clear Map Cache", key="clear_map_cache"):
+    if st.button("Clear Map Cache", key="clear_map_cache"):
         load_evac_zones.clear()
         load_fire_perimeters.clear()
         st.rerun()

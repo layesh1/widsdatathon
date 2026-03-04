@@ -330,7 +330,7 @@ STRICT RULES — NON-NEGOTIABLE:
 
 _PERSONA_MAP = {
     "Emergency Worker": (
-        "EVAC-OPS", "🚨",
+        "EVAC-OPS", "",
         f"""You are EVAC-OPS, an AI advisory assistant embedded in the 49ers Intelligence Lab
 Wildfire Evacuation Command System. You support emergency coordinators and dispatch personnel.
 {_PRIVACY_BLOCK}
@@ -348,7 +348,7 @@ RESPONSE STYLE:
         ["Active evacuation zones?", "Draft a SITREP", "High-risk ZIP codes", "Resource advisory"],
     ),
     "Caregiver/Evacuee": (
-        "SAFE-PATH", "🛡️",
+        "SAFE-PATH", "",
         f"""You are SAFE-PATH, a calm and supportive AI advisory assistant helping caregivers
 and evacuees during wildfire emergencies. You are part of the 49ers Intelligence Lab system.
 {_PRIVACY_BLOCK}
@@ -367,7 +367,7 @@ RESPONSE STYLE:
         ["What's in a go-bag?", "Zone A vs Zone B", "Help for wheelchair users", "Nearest shelter"],
     ),
     "Data Analyst": (
-        "DATA-LAB", "🔬",
+        "DATA-LAB", "",
         f"""You are DATA-LAB, a technical AI advisory assistant for data scientists and analysts
 working on the 49ers Intelligence Lab WiDS 2025 project: Wildfire Evacuation Alert System.
 {_PRIVACY_BLOCK}
@@ -399,7 +399,7 @@ with st.sidebar:
                 st.image(str(lp), use_container_width=True)
             break
     else:
-        st.markdown("<div style='text-align:center;font-size:2rem'>🔥</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center;font-size:0.8rem;opacity:0.5'>49ers Intelligence Lab</div>", unsafe_allow_html=True)
 
     st.markdown(
         "<div class='brand-block'>"
@@ -503,7 +503,7 @@ evacuation delays during wildfires, and can a data-driven alert system reduce th
 # ─────────────────────────────────────────────────────────────────────────────
 def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: bool = False):
     persona_name, persona_emoji, system_prompt, suggestions = _PERSONA_MAP.get(
-        role, ("Assistant", "🤖", "You are a wildfire evacuation advisory assistant.", [])
+        role, ("Assistant", "", "You are a wildfire evacuation advisory assistant.", [])
     )
 
     msgs = st.session_state.ai_messages
@@ -532,12 +532,12 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
             unsafe_allow_html=True,
         )
     with hdr_mid:
-        fs_label = "Exit Full" if st.session_state.ai_fullscreen else "⛶ Expand"
+        fs_label = "Exit Full" if st.session_state.ai_fullscreen else "Expand"
         if st.button(fs_label, key="ai_fs_inline", use_container_width=True):
             st.session_state.ai_fullscreen = not st.session_state.ai_fullscreen
             st.rerun()
     with hdr_right:
-        if st.button("✕ Close", key="ai_close_inline", use_container_width=True):
+        if st.button("Close", key="ai_close_inline", use_container_width=True):
             _end_and_save_session(username)
             st.session_state.show_ai_panel = False
             st.session_state.ai_fullscreen = False
@@ -555,7 +555,7 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
             <div class="ai-status-dot" title="Online"></div>
           </div>
           <div class="ai-advisory-banner">
-            ⚠️ Advisory guidance only — not a substitute for 911 or official emergency services
+            Advisory guidance only — not a substitute for 911 or official emergency services
           </div>
           <div class="ai-session-bar">
             <span>Session started {start_fmt}</span>
@@ -617,7 +617,7 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
                     <div class="chat-bubble-user">{content}</div>
                     <div class="msg-meta">{ts}</div>
                   </div>
-                  <div class="msg-avatar msg-avatar-user">👤</div>
+                  <div class="msg-avatar msg-avatar-user"></div>
                 </div>"""
             else:
                 msgs_html += f"""
@@ -649,7 +649,7 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
         )
         send_col, clear_col = st.columns([3, 1])
         with send_col:
-            send = st.form_submit_button("Send ➤", use_container_width=True, type="primary")
+            send = st.form_submit_button("Send", use_container_width=True, type="primary")
         with clear_col:
             clear = st.form_submit_button("Clear", use_container_width=True)
 
@@ -696,7 +696,7 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
     if displayable:
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
         show_hist = st.toggle(
-            f"📂 Past sessions ({len(displayable)} saved)",
+            f"Past sessions ({len(displayable)} saved)",
             value=st.session_state.ai_show_history,
             key="ai_hist_toggle",
         )
@@ -713,7 +713,7 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
                 except Exception:
                     label = sid
                 n = len(session.get("messages", []))
-                with st.expander(f"🗓 {label} — {n} messages"):
+                with st.expander(f"{label} — {n} messages"):
                     for m in session.get("messages", []):
                         ts_h = m.get("ts", "")
                         role_label = "You" if m["role"] == "user" else persona_name

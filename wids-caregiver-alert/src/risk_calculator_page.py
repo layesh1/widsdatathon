@@ -51,10 +51,10 @@ HIGH_RISK_COUNTIES = {
 
 
 def score_to_label(score):
-    if score >= 0.80: return "🔴 Critical", "#FF4444"
-    if score >= 0.60: return "🟠 High", "#FF9800"
-    if score >= 0.40: return "🟡 Moderate", "#FFC107"
-    return "🟢 Low-Moderate", "#4CAF50"
+    if score >= 0.80: return "Critical", "#FF4444"
+    if score >= 0.60: return "High", "#FF9800"
+    if score >= 0.40: return "Moderate", "#FFC107"
+    return "Low-Moderate", "#4CAF50"
 
 
 def get_nearest_fire_distance(lat, lon):
@@ -79,7 +79,7 @@ def get_nearest_fire_distance(lat, lon):
 
 
 def render_risk_calculator_page():
-    st.title("🧮 Personal Risk Calculator")
+    st.title("Personal Risk Calculator")
     st.caption(
         "A real, data-driven tool for caregivers and residents to understand their personal evacuation risk. "
         "Uses CDC SVI data, WiDS 2021–2025 fire timing, and FEMA evacuation time estimates."
@@ -170,7 +170,7 @@ def render_risk_calculator_page():
 
     # ── SECTION 3: Calculate ─────────────────────────────────────────────────
     st.divider()
-    if st.button("📊 Calculate My Risk Profile", type="primary"):
+    if st.button("Calculate My Risk Profile", type="primary"):
 
         evac_times = EVAC_TIME_ESTIMATES[mobility_key]
 
@@ -251,7 +251,7 @@ def render_risk_calculator_page():
         c3.metric(
             "Safety buffer",
             f"{net_buffer:+.2f}h",
-            delta="✓ You have time" if net_buffer > 0 else "⚠️ You may not have enough time",
+            delta="You have time" if net_buffer > 0 else "You may not have enough time",
             delta_color="normal" if net_buffer > 0 else "inverse"
         )
 
@@ -295,49 +295,49 @@ def render_risk_calculator_page():
         st.plotly_chart(fig_tl, use_container_width=True)
 
         # ── Specific recommendations ──
-        st.subheader("🎯 Your Action Plan")
+        st.subheader("Your Action Plan")
 
         recs = []
         if not has_go_bag:
-            recs.append("🎒 **Pack a go-bag** — saves ~30 min when ordered to evacuate. Include medications, documents, 3 days clothes.")
+            recs.append("**Pack a go-bag** — saves ~30 min when ordered to evacuate. Include medications, documents, 3 days clothes.")
         if not has_evac_plan:
-            recs.append("🗺️ **Write a route plan** — pre-identify 2 routes from your home to the nearest shelter. Saves ~15 min of decision time.")
+            recs.append("**Write a route plan** — pre-identify 2 routes from your home to the nearest shelter. Saves ~15 min of decision time.")
         if not has_alerts_on:
-            recs.append("📱 **Enable Wireless Emergency Alerts** (Settings → Notifications → Emergency Alerts). Free, no app needed.")
+            recs.append("**Enable Wireless Emergency Alerts** (Settings → Notifications → Emergency Alerts). Free, no app needed.")
         if has_caregiver == "No" and county_svi >= 0.75:
-            recs.append("👥 **Enroll in a caregiver network** — your high-SVI county means fires grow 17% faster. A caregiver alert adds ~45 min buffer.")
+            recs.append("**Enroll in a caregiver network** — your high-SVI county means fires grow 17% faster. A caregiver alert adds ~45 min buffer.")
         if nearby_dependents > 0:
-            recs.append(f"⏰ **Your {nearby_dependents} dependent(s) add ~{dependent_add*60:.0f} min** to evacuation. Start packing earlier than your household's official order threshold.")
+            recs.append(f"**Your {nearby_dependents} dependent(s) add ~{dependent_add*60:.0f} min** to evacuation. Start packing earlier than your household's official order threshold.")
         if "Large" in pets_livestock:
-            recs.append("🐴 **Pre-arrange livestock transport** — large animals need a trailer and loading time. Identify a neighbor or service in advance.")
+            recs.append("**Pre-arrange livestock transport** — large animals need a trailer and loading time. Identify a neighbor or service in advance.")
         if net_buffer < 0:
-            recs.append(f"⚠️ **Your evacuation takes longer than typical warning time.** Consider moving to less fire-prone area, or ensuring you have a caregiver alert enrolled.")
+            recs.append(f"**Your evacuation takes longer than typical warning time.** Consider moving to less fire-prone area, or ensuring you have a caregiver alert enrolled.")
         if distance_to_wui < 1.0:
-            recs.append("🏡 **You live within 1 mile of wildland** — this is WUI (Wildland-Urban Interface). Apply ember-resistant vents, clear 100ft defensible space.")
+            recs.append("**You live within 1 mile of wildland** — this is WUI (Wildland-Urban Interface). Apply ember-resistant vents, clear 100ft defensible space.")
 
         for rec in recs:
             st.markdown(f"- {rec}")
 
         if not recs:
-            st.success("✅ Your preparation level is solid. Keep go-bag updated seasonally and review your route plan annually.")
+            st.success("Your preparation level is solid. Keep go-bag updated seasonally and review your route plan annually.")
 
         # ── Live fire check ──
         if county_lat and county_lon:
             st.divider()
-            st.subheader("🛰️ Nearest Active Fire (Live Check)")
+            st.subheader("Nearest Active Fire (Live Check)")
             with st.spinner("Checking NASA FIRMS..."):
                 fires = get_nearest_fire_distance(county_lat, county_lon)
             if fires:
                 closest_km = fires[0][2]
                 closest_mi = closest_km * 0.621
                 if closest_mi < 10:
-                    st.error(f"🔴 Active fire detected **{closest_mi:.1f} miles** from your county centroid — review evacuation status now.")
+                    st.error(f"Active fire detected **{closest_mi:.1f} miles** from your county centroid — review evacuation status now.")
                 elif closest_mi < 50:
-                    st.warning(f"🟠 Active fire detected **{closest_mi:.1f} miles** from your county. Monitor conditions.")
+                    st.warning(f"Active fire detected **{closest_mi:.1f} miles** from your county. Monitor conditions.")
                 else:
-                    st.success(f"🟢 Nearest active fire is **{closest_mi:.1f} miles** away. No immediate threat.")
+                    st.success(f"Nearest active fire is **{closest_mi:.1f} miles** away. No immediate threat.")
             else:
-                st.info("🟡 NASA FIRMS check unavailable — check firms.modaps.eosdis.nasa.gov directly.")
+                st.info("NASA FIRMS check unavailable — check firms.modaps.eosdis.nasa.gov directly.")
 
         st.caption(
             "Risk score uses CDC SVI, WiDS 2021–2025 real fire timing data, and FEMA evacuation time estimates. "

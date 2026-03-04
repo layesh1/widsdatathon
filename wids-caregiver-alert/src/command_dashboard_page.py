@@ -120,13 +120,13 @@ def init_evacuee_tracker(dispatcher_username: str = "dispatcher"):
 # ── Main render ───────────────────────────────────────────────────────────────
 
 def render_command_dashboard(fire_data, fire_source, fire_label):
-    st.title("⚡ Command Dashboard")
+    st.title("Command Dashboard")
     st.caption(f"Emergency Worker View  ·  {fire_label}  ·  WiDS 2021–2025 Historical Benchmarks")
 
     init_evacuee_tracker(st.session_state.get("username", "dispatcher"))
 
     # ── Historical benchmarks (always real) ──────────────────────────────────
-    st.subheader("📊 Historical Response Benchmarks  *(WiDS 2021–2025)*")
+    st.subheader("Historical Response Benchmarks  *(WiDS 2021–2025)*")
     h1, h2, h3, h4 = st.columns(4)
     h1.metric("Median Time to Evac Order",  "1.1h",
               help="653 fires with confirmed evac actions, 2021–2025")
@@ -139,7 +139,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
     tab_map, tab_evacuees, tab_resources = st.tabs([
-        "🗺️ Fire Map", "👥 Evacuee Status Tracker", "🚒 Fire Dept Resources"
+        "Fire Map", "Evacuee Status Tracker", "Fire Dept Resources"
     ])
 
     # ════════ TAB 1: FIRE MAP ═══════════════════════════════════════════════
@@ -178,7 +178,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                         tooltip=folium.GeoJsonTooltip(fields=[], aliases=[])
                     ).add_to(m)
                 except Exception as e:
-                    st.caption(f"⚠️ Fire perimeters: {e}")
+                    st.caption(f"Fire perimeters unavailable: {e}")
 
         if show_evac_zones:
             evac_path = load_geojson_layer("evac_zones_map.geojson")
@@ -195,7 +195,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                         }
                     ).add_to(m)
                 except Exception as e:
-                    st.caption(f"⚠️ Evac zones: {e}")
+                    st.caption(f"Evac zones unavailable: {e}")
 
         # Live fire hotspots
         n_plotted = 0
@@ -265,11 +265,11 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 "GeoJSON layers load from local src/ directory"
             )
         else:
-            st.caption("⚪ No live fire data. Map shows vulnerable county locations only.")
+            st.caption("No live fire data. Map shows vulnerable county locations only.")
 
     # ════════ TAB 2: EVACUEE STATUS TRACKER ══════════════════════════════════
     with tab_evacuees:
-        st.subheader("👥 Vulnerable Resident Evacuation Status")
+        st.subheader("Vulnerable Resident Evacuation Status")
         st.markdown(
             "Track whether high-risk individuals in active evacuation zones have been "
             "confirmed as evacuated. Update status as field teams make contact."
@@ -285,7 +285,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
         k1, k2, k3 = st.columns(3)
         k1.metric("Total Tracked Residents", total)
         k2.metric("Confirmed Evacuated",      evacuated, delta=f"{evacuated/total*100:.0f}%")
-        k3.metric("⚠️ Unconfirmed",           unconf,
+        k3.metric("Unconfirmed",           unconf,
                   delta="Needs contact" if unconf > 0 else "All confirmed",
                   delta_color="inverse" if unconf > 0 else "normal")
 
@@ -303,10 +303,10 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
                 if row["status"] == "Evacuated ✅":
                     st.success("Evacuated ✅")
                 else:
-                    st.warning("Unconfirmed ⚠️")
+                    st.warning("Unconfirmed")
             with col_btn:
                 if row["status"] != "Evacuated ✅":
-                    if st.button("✅ Mark Evacuated", key=f"evac_{i}"):
+                    if st.button("Mark Evacuated", key=f"evac_{i}"):
                         st.session_state.evacuee_list.at[i, "status"] = "Evacuated ✅"
                         try:
                             from auth_supabase import get_supabase
@@ -341,7 +341,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
         st.divider()
 
         # Add new resident
-        with st.expander("➕ Add resident to tracker"):
+        with st.expander("Add resident to tracker"):
             c1, c2, c3, c4 = st.columns(4)
             new_name    = c1.text_input("Name")
             new_addr    = c2.text_input("Address")
@@ -376,7 +376,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
     # ════════ TAB 3: FIRE DEPT RESOURCES ════════════════════════════════════
     with tab_resources:
-        st.subheader("🚒 Fire Department Resources — USFA National Registry")
+        st.subheader("Fire Department Resources — USFA National Registry")
 
         usfa_df = load_usfa()
         if usfa_df is None:

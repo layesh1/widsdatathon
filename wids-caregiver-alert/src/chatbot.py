@@ -133,9 +133,9 @@ TONE: Collaborative, rigorous, like a senior data scientist on the team.
 }
 
 ROLE_LABELS = {
-    "emergency_worker": "🚨 Emergency Evacuator",
-    "evacuee": "🏃 Evacuee / Caregiver",
-    "analyst": "📊 Data Analyst"
+    "emergency_worker": "Emergency Evacuator",
+    "evacuee": "Evacuee / Caregiver",
+    "analyst": "Data Analyst"
 }
 
 ROLE_COLORS = {
@@ -146,7 +146,7 @@ ROLE_COLORS = {
 
 # ── Login screen ──────────────────────────────────────────────────────────────
 def login_screen():
-    st.title("🔥 Wildfire Evacuation Alert System")
+    st.title("Wildfire Evacuation Alert System")
     st.caption("49ers Intelligence Lab | WiDS Datathon 2025")
     st.divider()
 
@@ -204,12 +204,12 @@ def chat_screen():
             st.markdown("- Extending the project")
 
         st.divider()
-        if st.button("🚪 Logout", use_container_width=True):
+        if st.button("Logout", use_container_width=True):
             for key in ["logged_in", "username", "role", "messages"]:
                 st.session_state.pop(key, None)
             st.rerun()
 
-        if st.button("🗑️ Clear Chat", use_container_width=True):
+        if st.button("Clear Chat", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
