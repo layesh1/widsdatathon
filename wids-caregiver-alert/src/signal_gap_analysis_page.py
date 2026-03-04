@@ -101,8 +101,11 @@ def _cumulative_delay_pct(delay_df, hours_thresholds):
 
 
 def render_signal_gap_analysis():
-    st.title("Signal Gap Analysis")
-    st.caption("WiDS 2021–2025 · Fires with early warning signals that received no evacuation action")
+    from ui_utils import page_header, section_header
+    page_header(
+        "Signal Gap Analysis",
+        "WiDS 2021-2025 — Fires with early warning signals that received no evacuation action",
+    )
 
     st.markdown("""
     > **Core Finding:** The system detected early fire signals for tens of thousands of incidents.
@@ -247,71 +250,64 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
     )
     st.plotly_chart(fig_delay, use_container_width=True)
 
-    # ── Dangerous delay candidates table ─────────────────────────────────────
-    st.divider()
-    st.subheader("Fires with Signal — No Action Taken")
+    # ── Dangerous delay candidates table — progressive disclosure ─────────────
+    with st.expander(f"Detail: fires with signal, no action taken ({no_action:,} verified)"):
+        if not danger_df.empty:
+            display_df = danger_df.copy()
+            if "first_signal_time" in display_df.columns:
+                display_df["first_signal_time"] = pd.to_datetime(
+                    display_df["first_signal_time"], errors="coerce", utc=True
+                ).dt.strftime("%Y-%m-%d %H:%M UTC")
+            col_map = {
+                "geo_event_id": "Event ID",
+                "name": "Fire Name",
+                "geo_event_type": "Type",
+                "notification_type": "Notification",
+                "external_source": "Source",
+                "first_signal_time": "Signal Detected",
+            }
+            display_df = display_df.rename(columns=col_map)
+            display_df = display_df[[c for c in col_map.values() if c in display_df.columns]]
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.caption(f"{len(display_df):,} fires shown — all had early signals but no evacuation action (WiDS 2021-2025)")
+        else:
+            st.info(
+                f"Full candidate list requires Supabase connection. "
+                f"Verified: {no_action:,} fires had signals with no evacuation action (1.6M row dataset)."
+            )
 
-    if not danger_df.empty:
-        # Parse and display
-        display_df = danger_df.copy()
-        if "first_signal_time" in display_df.columns:
-            display_df["first_signal_time"] = pd.to_datetime(
-                display_df["first_signal_time"], errors="coerce", utc=True
-            ).dt.strftime("%Y-%m-%d %H:%M UTC")
-
-        col_map = {
-            "geo_event_id": "Event ID",
-            "name": "Fire Name",
-            "geo_event_type": "Type",
-            "notification_type": "Notification",
-            "external_source": "Source",
-            "first_signal_time": "Signal Detected",
-        }
-        display_df = display_df.rename(columns=col_map)
-        display_df = display_df[[c for c in col_map.values() if c in display_df.columns]]
-
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-        st.caption(f"{len(display_df):,} fires shown · All had early signals but no evacuation action *(WiDS 2021–2025)*")
-    else:
-        # Verified stat displayed when live table is unavailable
-        st.info(
-            f"Full candidate list requires Supabase connection. "
-            f"Verified: **{no_action:,} fires** had signals with no evacuation action (1.6M row dataset)."
-        )
-
-    # ── Delay by source/agency ────────────────────────────────────────────────
+    # ── Delay by source/agency — progressive disclosure ───────────────────────
     if not delay_df.empty:
-        st.divider()
-        st.subheader("Response Delay by Reporting Agency")
-        st.caption("Total fires with early signal detected, by reporting agency — nearly all received no evacuation action")
-
-        plot_delay = delay_df.copy()
-        plot_delay = plot_delay.dropna(subset=["source_attribution"])
-        plot_delay["incidents_with_signal"] = pd.to_numeric(plot_delay["incidents_with_signal"], errors="coerce")
-        plot_delay = (
-            plot_delay.groupby("source_attribution")["incidents_with_signal"]
-            .sum()
-            .reset_index()
-            .sort_values("incidents_with_signal", ascending=True)
-            .tail(15)
-        )
-        plot_delay = plot_delay[plot_delay["incidents_with_signal"] > 0]
-
-        fig_agency = go.Figure(go.Bar(
-            x=plot_delay["incidents_with_signal"],
-            y=plot_delay["source_attribution"],
-            orientation="h",
-            marker_color="#4a90d9",
-            text=plot_delay["incidents_with_signal"].astype(int).astype(str),
-            textposition="outside",
-        ))
-        fig_agency.update_layout(
-            template="plotly_dark",
-            xaxis_title="Fires with Signal (No Evacuation Action)",
-            height=400,
-            margin=dict(l=120, r=60, t=20, b=40),
-        )
-        st.plotly_chart(fig_agency, use_container_width=True)
+        with st.expander("Detail: response delay by reporting agency"):
+            st.caption("Fires with early signal detected by agency — nearly all received no evacuation action")
+            plot_delay = delay_df.copy()
+            plot_delay = plot_delay.dropna(subset=["source_attribution"])
+            plot_delay["incidents_with_signal"] = pd.to_numeric(
+                plot_delay["incidents_with_signal"], errors="coerce"
+            )
+            plot_delay = (
+                plot_delay.groupby("source_attribution")["incidents_with_signal"]
+                .sum()
+                .reset_index()
+                .sort_values("incidents_with_signal", ascending=True)
+                .tail(15)
+            )
+            plot_delay = plot_delay[plot_delay["incidents_with_signal"] > 0]
+            fig_agency = go.Figure(go.Bar(
+                x=plot_delay["incidents_with_signal"],
+                y=plot_delay["source_attribution"],
+                orientation="h",
+                marker_color="#4a90d9",
+                text=plot_delay["incidents_with_signal"].astype(int).astype(str),
+                textposition="outside",
+            ))
+            fig_agency.update_layout(
+                template="plotly_dark",
+                xaxis_title="Fires with Signal (No Evacuation Action)",
+                height=400,
+                margin=dict(l=120, r=60, t=20, b=40),
+            )
+            st.plotly_chart(fig_agency, use_container_width=True)
 
     # ── Warning / Advisory / Order timeline ──────────────────────────────────
     st.divider()
@@ -385,10 +381,10 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
         "**A caregiver alert at signal detection predates all three tiers**, giving vulnerable populations the head start they need."
     )
 
-    # ── Extreme fires with no evacuation ─────────────────────────────────────
+    # ── Extreme fires and silent fires — progressive disclosure ───────────────
     st.divider()
-    st.subheader("Extreme-Spread Fires: The Highest-Risk Gap")
-    st.caption("Fires classified 'extreme' spread rate by incident commanders — and whether they received any evacuation action")
+    with st.expander("Extreme-spread fires: the highest-risk gap (298 fires, 70.8% got no action)", expanded=True):
+        st.caption("Fires classified 'extreme' spread rate by incident commanders — and whether they received any evacuation action")
 
     col_ex1, col_ex2, col_ex3 = st.columns(3)
     col_ex1.metric(
@@ -437,10 +433,9 @@ At the **median response time of {median_min/60:.1f} hours**, our modeled 0.85h 
 > This is the most critical gap for a proactive caregiver alert system.
     """)
 
-    # ── Silent fire explainer ─────────────────────────────────────────────────
-    st.divider()
-    st.subheader("Silent Fires: The 73% Story")
-    st.caption("The single most important equity finding from the WiDS 2021–2025 dataset")
+    # ── Silent fire explainer — progressive disclosure ────────────────────────
+    with st.expander("Silent fires: the 73% story (key equity finding)", expanded=True):
+        st.caption("The central finding from the WiDS 2021-2025 dataset")
 
     col_s1, col_s2, col_s3 = st.columns(3)
     col_s1.metric(

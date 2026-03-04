@@ -117,35 +117,54 @@ def get_nearest_fire_distance(lat, lon):
 
 
 def render_risk_calculator_page():
-    st.title("Personal Risk Calculator")
-    st.caption(
-        "A real, data-driven tool for caregivers and residents to understand their personal evacuation risk. "
-        "Uses CDC SVI data, WiDS 2021–2025 fire timing, and FEMA evacuation time estimates."
+    from ui_utils import page_header, section_header, render_card
+
+    page_header(
+        "Personal Risk Calculator",
+        "How much time would you actually have if a wildfire started nearby?  "
+        "Uses CDC SVI, WiDS 2021-2025 fire timing, and FEMA evacuation estimates.",
     )
 
-    st.markdown("""
-    This calculator answers: **"If a wildfire starts nearby, how much time do I actually have — and is it enough?"**
+    # ── Hero row — 3 key benchmark cards ─────────────────────────────────────
+    h1, h2, h3 = st.columns(3)
+    with h1:
+        render_card(
+            "Median time to evacuation order",
+            "1.1 hours",
+            "Historical average for fires that received any official action (n=653)",
+            "#d4a017",
+        )
+    with h2:
+        render_card(
+            "Fire growth in high-vulnerability counties",
+            "+17% faster",
+            "Fires spread faster in counties with fewer resources and more barriers",
+            "#FF4B4B",
+        )
+    with h3:
+        render_card(
+            "Worst-case delay (90th percentile)",
+            "32 hours",
+            "1 in 10 fires gets no evacuation order for over a day",
+            "#FF4B4B",
+        )
 
-    It combines your personal mobility situation with real fire statistics from the WiDS dataset
-    and checks NASA FIRMS for active fires near your location.
-    """)
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
-    st.divider()
+    # ── F-pattern layout: inputs LEFT (2/3), context RIGHT (1/3) ─────────────
+    col_in, col_ctx = st.columns([2, 1])
 
-    # ── SECTION 1: Location & County Vulnerability ───────────────────────────
-    st.subheader("1. Your Location & County Risk")
-
-    col1, col2 = st.columns(2)
-    with col1:
+    with col_in:
+        section_header("Your location")
         county_choice = st.selectbox(
-            "Select your county (or choose 'Other')",
-            list(HIGH_RISK_COUNTIES.keys())
+            "Select your county",
+            list(HIGH_RISK_COUNTIES.keys()),
         )
         if county_choice == "Other (enter manually)":
             svi_manual = st.slider(
-                "Your county's CDC SVI score",
+                "Your county CDC SVI score",
                 0.0, 1.0, 0.5, step=0.01,
-                help="Find at: cdc.gov/cdc-atsdr-gis/SVI/ — RPL_THEMES column"
+                help="Find at: cdc.gov/cdc-atsdr-gis/SVI/ — RPL_THEMES column",
             )
             lat_manual = st.number_input("Latitude (optional, for live fire check)", value=37.5)
             lon_manual = st.number_input("Longitude (optional)", value=-120.0)
@@ -153,90 +172,10 @@ def render_risk_calculator_page():
             county_lat, county_lon = lat_manual, lon_manual
         else:
             info = HIGH_RISK_COUNTIES[county_choice]
-            county_svi  = info["svi"]
-            county_lat  = info["lat"]
-            county_lon  = info["lon"]
-            st.metric("County SVI Score", f"{county_svi:.2f}",
-                      delta="High vulnerability" if county_svi >= 0.75 else "Moderate vulnerability",
-                      delta_color="inverse")
+            county_svi = info["svi"]
+            county_lat, county_lon = info["lat"], info["lon"]
 
-            # SVI sub-theme breakdown
-            sub_themes = {
-                "Socioeconomic": info.get("svi_socioeconomic"),
-                "Household\nComposition": info.get("svi_household"),
-                "Minority\nStatus": info.get("svi_minority"),
-                "Housing\nType": info.get("svi_housing"),
-            }
-            if all(v is not None for v in sub_themes.values()):
-                primary_driver = max(sub_themes, key=lambda k: sub_themes[k])
-                theme_colors = [
-                    "#FF4444" if v == max(sub_themes.values()) else "#4a90d9"
-                    for v in sub_themes.values()
-                ]
-                fig_svi = go.Figure(go.Bar(
-                    x=list(sub_themes.keys()),
-                    y=list(sub_themes.values()),
-                    marker_color=theme_colors,
-                    text=[f"{v:.2f}" for v in sub_themes.values()],
-                    textposition="outside",
-                ))
-                fig_svi.update_layout(
-                    template="plotly_dark",
-                    title=f"SVI Sub-theme Breakdown — {county_choice}",
-                    yaxis=dict(range=[0, 1.15], title="Percentile Rank (0–1)"),
-                    height=220,
-                    margin=dict(l=10, r=10, t=50, b=10),
-                )
-                st.plotly_chart(fig_svi, use_container_width=True)
-                st.caption(
-                    f"Primary vulnerability driver: **{primary_driver.replace(chr(10), ' ')}** "
-                    f"({sub_themes[primary_driver]:.2f}). "
-                    "WiDS data: minority status dimension has strongest correlation with evacuation delay."
-                )
-
-            # Vulnerable population breakdown stacked bar
-            pop_fields = {
-                "Age 65+": info.get("pop_age65"),
-                "Disability": info.get("pop_disability"),
-                "Below Poverty": info.get("pop_poverty"),
-                "No Vehicle": info.get("pop_no_vehicle"),
-            }
-            if all(v is not None for v in pop_fields.values()):
-                pop_colors = ["#FF9800", "#4a90d9", "#FF4444", "#FFC107"]
-                fig_pop = go.Figure()
-                for (label, val), color in zip(pop_fields.items(), pop_colors):
-                    fig_pop.add_trace(go.Bar(
-                        name=label, x=[county_choice], y=[val],
-                        marker_color=color,
-                        text=[f"{val:,}"], textposition="inside",
-                    ))
-                fig_pop.update_layout(
-                    template="plotly_dark",
-                    barmode="stack",
-                    title="Vulnerable Population Composition",
-                    yaxis_title="Persons",
-                    height=220,
-                    margin=dict(l=10, r=10, t=50, b=10),
-                    legend=dict(orientation="h", y=-0.2),
-                    showlegend=True,
-                )
-                st.plotly_chart(fig_pop, use_container_width=True)
-
-    with col2:
-        st.markdown("**What SVI means for fire risk:**")
-        st.markdown(f"""
-        - Median fire-to-evac-order time: **{MEDIAN_EVAC_ORDER_H}h** (all counties)
-        - In high-SVI counties (like yours): fires grow **{(VULNERABLE_GROWTH_MULTIPLIER-1)*100:.0f}% faster**
-        - 1 in 10 fires takes **{P90_EVAC_ORDER_H:.0f}h** to get an official order
-        - Higher SVI = less likely to have car, caregiver, or early warning access
-        """)
-
-    # ── SECTION 2: Personal Situation ────────────────────────────────────────
-    st.divider()
-    st.subheader("2. Your Personal Situation")
-
-    col3, col4 = st.columns(2)
-    with col3:
+        section_header("Your situation")
         mobility = st.selectbox(
             "Mobility level",
             [
@@ -246,58 +185,149 @@ def render_risk_calculator_page():
                 ("no_vehicle",         "No personal vehicle"),
                 ("medical_equipment",  "Medical equipment (O2, dialysis, etc.)"),
             ],
-            format_func=lambda x: x[1]
+            format_func=lambda x: x[1],
         )
         mobility_key = mobility[0]
 
-        has_caregiver = st.radio(
-            "Do you have a caregiver who could give early warning?",
-            ["Yes, reliably reachable", "Sometimes", "No"]
+        ca, cb = st.columns(2)
+        with ca:
+            has_caregiver = st.radio(
+                "Caregiver who could give early warning?",
+                ["Yes, reliably", "Sometimes", "No"],
+            )
+            distance_to_wui = st.slider(
+                "Miles from nearest wildland edge",
+                0.5, 25.0, 3.0, step=0.5,
+                help="WUI = Wildland-Urban Interface. Lower = higher risk.",
+            )
+        with cb:
+            has_go_bag    = st.checkbox("Go-bag packed and ready")
+            has_evac_plan = st.checkbox("Written evacuation plan with route")
+            has_alerts_on = st.checkbox("Wireless Emergency Alerts enabled on phone")
+            nearby_dependents = st.number_input(
+                "Dependents needing help", 0, 10, 0,
+            )
+            pets_livestock = st.radio(
+                "Pets or livestock?",
+                ["None", "Small pets", "Large animals / livestock"],
+            )
+
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        # Primary CTA — bottom of input column (Fitts's Law)
+        calculate = st.button(
+            "Calculate My Risk Profile",
+            type="primary",
+            use_container_width=True,
+            key="calc_btn",
         )
 
-        distance_to_wui = st.slider(
-            "Distance from nearest wildland edge (miles)",
-            0.5, 25.0, 3.0, step=0.5,
-            help="WUI = Wildland-Urban Interface. Lower distance = higher risk."
+    with col_ctx:
+        section_header("What this means")
+        st.markdown(
+            f"The median time from fire ignition to an evacuation order is "
+            f"**{MEDIAN_EVAC_ORDER_H}h**. In high-vulnerability counties, fires "
+            f"grow **{(VULNERABLE_GROWTH_MULTIPLIER - 1) * 100:.0f}% faster** — "
+            f"and 1 in 10 fires takes over **{P90_EVAC_ORDER_H:.0f} hours** to "
+            f"get any official order."
+        )
+        st.markdown(
+            "Higher SVI means fewer cars, less access to warnings, and more "
+            "barriers to leaving quickly."
         )
 
-    with col4:
-        has_go_bag = st.checkbox("I have a go-bag packed and ready")
-        has_evac_plan = st.checkbox("I have a written evacuation plan with route")
-        has_alerts_on = st.checkbox("I receive Wireless Emergency Alerts (WEA) on my phone")
-        nearby_dependents = st.number_input("Dependents needing assistance (children, elderly, disabled)", 0, 10, 0)
-        pets_livestock = st.radio("Pets or livestock?", ["None", "Small pets only", "Large animals / livestock"])
+        if county_choice != "Other (enter manually)":
+            info = HIGH_RISK_COUNTIES[county_choice]
+            svi_val = info.get("svi") or 0.0
+            svi_color = (
+                "#FF4B4B" if svi_val >= 0.75 else
+                "#d4a017" if svi_val >= 0.5 else
+                "#3fb950"
+            )
+            svi_label = (
+                "High vulnerability" if svi_val >= 0.75 else
+                "Moderate vulnerability" if svi_val >= 0.5 else
+                "Lower vulnerability"
+            )
+            render_card(
+                "County SVI score",
+                f"{svi_val:.2f}",
+                f"{svi_label} — percentile rank (0 = low, 1 = highest)",
+                svi_color,
+            )
 
-    # ── SECTION 3: Calculate ─────────────────────────────────────────────────
-    st.divider()
-    if st.button("Calculate My Risk Profile", type="primary"):
+            # Vulnerable population detail — progressive disclosure
+            sub_themes = {
+                "Socioeconomic": info.get("svi_socioeconomic"),
+                "Household":     info.get("svi_household"),
+                "Minority":      info.get("svi_minority"),
+                "Housing":       info.get("svi_housing"),
+            }
+            pop_fields = {
+                "Age 65+":      info.get("pop_age65"),
+                "Disability":   info.get("pop_disability"),
+                "Below poverty":info.get("pop_poverty"),
+                "No vehicle":   info.get("pop_no_vehicle"),
+            }
+            with st.expander("County vulnerability detail"):
+                if all(v is not None for v in sub_themes.values()):
+                    primary_driver = max(sub_themes, key=lambda k: sub_themes[k])
+                    max_val = max(sub_themes.values())
+                    theme_colors = [
+                        "#FF4B4B" if v == max_val else "#4a90d9"
+                        for v in sub_themes.values()
+                    ]
+                    fig_svi = go.Figure(go.Bar(
+                        x=list(sub_themes.keys()),
+                        y=list(sub_themes.values()),
+                        marker_color=theme_colors,
+                        text=[f"{v:.2f}" for v in sub_themes.values()],
+                        textposition="outside",
+                    ))
+                    fig_svi.update_layout(
+                        template="plotly_dark",
+                        title=f"SVI sub-themes — {county_choice}",
+                        yaxis=dict(range=[0, 1.15], title="Percentile (0–1)"),
+                        height=210,
+                        margin=dict(l=10, r=10, t=44, b=10),
+                    )
+                    st.plotly_chart(fig_svi, use_container_width=True)
+                    st.caption(
+                        f"Primary driver: {primary_driver} ({sub_themes[primary_driver]:.2f}). "
+                        "Minority status has the strongest correlation with evacuation delay (WiDS data)."
+                    )
+                if all(v is not None for v in pop_fields.values()):
+                    pop_colors = ["#FF9800", "#4a90d9", "#FF4B4B", "#FFC107"]
+                    fig_pop = go.Figure()
+                    for (lbl, val), c in zip(pop_fields.items(), pop_colors):
+                        fig_pop.add_trace(go.Bar(
+                            name=lbl, x=[county_choice], y=[val],
+                            marker_color=c, text=[f"{val:,}"], textposition="inside",
+                        ))
+                    fig_pop.update_layout(
+                        template="plotly_dark", barmode="stack",
+                        title="Vulnerable population",
+                        yaxis_title="Persons",
+                        height=190,
+                        margin=dict(l=10, r=10, t=40, b=10),
+                        legend=dict(orientation="h", y=-0.35),
+                    )
+                    st.plotly_chart(fig_pop, use_container_width=True)
 
-        evac_times = EVAC_TIME_ESTIMATES[mobility_key]
-
-        # Additional time factors
-        dependent_add   = nearby_dependents * 0.25  # 15 min per dependent
-        pet_add         = 0.25 if "Large" in pets_livestock else (0.15 if "Small" in pets_livestock else 0)
-        no_bag_add      = 0.5 if not has_go_bag else 0
-        no_plan_add     = 0.25 if not has_evac_plan else 0
-
+    # ── Calculation ───────────────────────────────────────────────────────────
+    if calculate:
+        evac_times    = EVAC_TIME_ESTIMATES[mobility_key]
+        dependent_add = nearby_dependents * 0.25
+        pet_add       = 0.25 if "Large" in pets_livestock else (0.15 if "Small" in pets_livestock else 0)
+        no_bag_add    = 0.5  if not has_go_bag   else 0
+        no_plan_add   = 0.25 if not has_evac_plan else 0
         total_evac_time = evac_times["total"] + dependent_add + pet_add + no_bag_add + no_plan_add
 
-        # Alert lead time
-        caregiver_lead = {"Yes, reliably reachable": 0.75, "Sometimes": 0.30, "No": 0.0}[has_caregiver]
+        caregiver_lead      = {"Yes, reliably": 0.75, "Sometimes": 0.30, "No": 0.0}[has_caregiver]
         official_order_time = MEDIAN_EVAC_ORDER_H * (VULNERABLE_GROWTH_MULTIPLIER if county_svi >= 0.75 else 1.0)
+        time_available      = caregiver_lead + official_order_time
+        net_buffer          = time_available - total_evac_time
 
-        # Distance factor (rough: WUI fire can reach 1-2 mph spread, so distance matters)
-        time_before_fire_arrives = distance_to_wui / 1.5  # hours at ~1.5 mph spread
-
-        # Net buffer
-        if caregiver_lead > 0:
-            time_available = caregiver_lead + official_order_time
-        else:
-            time_available = official_order_time
-        net_buffer = time_available - total_evac_time
-
-        # Overall risk score
-        risk_score = (
+        risk_score = min(0.98, (
             (county_svi * 0.30) +
             (min(1.0, total_evac_time / 4) * 0.25) +
             ((1 - min(1.0, distance_to_wui / 10)) * 0.20) +
@@ -305,141 +335,146 @@ def render_risk_calculator_page():
              (0 if has_evac_plan else 0.1) +
              (0 if has_go_bag else 0.05)) +
             (min(1.0, nearby_dependents / 4) * 0.10)
-        )
-        risk_score = min(0.98, risk_score)
-
+        ))
         label, color = score_to_label(risk_score)
 
-        # ── Display results ──
-        st.subheader("Your Risk Profile")
-
-        # Big risk score
-        gauge_fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=risk_score * 100,
-            title={"text": "Overall Risk Score", "font": {"size": 18}},
-            gauge={
-                "axis": {"range": [0, 100]},
-                "bar": {"color": color},
-                "steps": [
-                    {"range": [0, 40],  "color": "#1a3a1a"},
-                    {"range": [40, 60], "color": "#3a2a00"},
-                    {"range": [60, 80], "color": "#3a1400"},
-                    {"range": [80, 100],"color": "#2a0000"},
-                ]
-            },
-            number={"suffix": " / 100", "font": {"size": 28}}
-        ))
-        gauge_fig.update_layout(template="plotly_dark", height=250,
-                                 margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(gauge_fig, use_container_width=True)
-
-        st.markdown(f"### {label}")
-
-        # Time analysis
-        c1, c2, c3 = st.columns(3)
-        c1.metric(
-            "Time needed to evacuate",
-            f"{total_evac_time:.2f}h",
-            help="Based on your mobility, dependents, and preparation level"
-        )
-        c2.metric(
-            "Expected time before official order",
-            f"{official_order_time:.1f}h",
-            help=f"WiDS median {MEDIAN_EVAC_ORDER_H}h, adjusted for SVI"
-        )
-        c3.metric(
-            "Safety buffer",
-            f"{net_buffer:+.2f}h",
-            delta="You have time" if net_buffer > 0 else "You may not have enough time",
-            delta_color="normal" if net_buffer > 0 else "inverse"
+        st.session_state.risk_calculated = True
+        st.session_state.risk_results = dict(
+            risk_score=risk_score, label=label, color=color,
+            total_evac_time=total_evac_time,
+            official_order_time=official_order_time,
+            net_buffer=net_buffer,
+            caregiver_lead=caregiver_lead,
+            county_svi=county_svi, county_lat=county_lat, county_lon=county_lon,
+            county_choice=county_choice,
+            has_go_bag=has_go_bag, has_evac_plan=has_evac_plan,
+            has_alerts_on=has_alerts_on, has_caregiver=has_caregiver,
+            nearby_dependents=nearby_dependents, pets_livestock=pets_livestock,
+            distance_to_wui=distance_to_wui,
+            evac_times=evac_times, no_bag_add=no_bag_add, no_plan_add=no_plan_add,
+            dependent_add=dependent_add,
         )
 
-        # Timeline visualization
-        st.subheader("Your Evacuation Timeline")
-        events = [
-            ("Fire ignition", 0),
-            (f"Caregiver alert (if enrolled)", caregiver_lead),
-            (f"Official evacuation order (median)", official_order_time),
-            (f"You complete evacuation", official_order_time + evac_times["total"] + no_bag_add + no_plan_add),
-            (f"90th percentile order delay", P90_EVAC_ORDER_H),
-        ]
+    # ── Results section — shown whenever results are in session_state ─────────
+    if st.session_state.get("risk_calculated"):
+        from ui_utils import section_header as _sh
+        res = st.session_state.risk_results
 
-        fig_tl = go.Figure()
-        for i, (event, time) in enumerate(events):
-            color_dot = "#FF4444" if time > official_order_time + evac_times["total"] else (
-                "#FFC107" if time > official_order_time else "#4a90d9"
+        st.divider()
+        _sh("Your risk profile")
+
+        # F-pattern: risk badge LEFT, timeline chart RIGHT
+        res_l, res_r = st.columns([1, 1])
+
+        with res_l:
+            render_card(
+                f"Overall risk — {res['label']}",
+                f"{res['risk_score'] * 100:.0f} / 100",
+                "Based on county SVI, mobility situation, and preparation level",
+                res["color"],
             )
-            fig_tl.add_trace(go.Scatter(
-                x=[time], y=[i],
-                mode="markers+text",
-                marker=dict(size=14, color=color_dot),
-                text=[event],
-                textposition="middle right",
-                showlegend=False
-            ))
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Time to evacuate",   f"{res['total_evac_time']:.1f}h")
+            c2.metric("Expected warning",   f"{res['official_order_time']:.1f}h")
+            c3.metric(
+                "Safety buffer",
+                f"{res['net_buffer']:+.1f}h",
+                delta="Adequate" if res["net_buffer"] > 0 else "Insufficient",
+                delta_color="normal" if res["net_buffer"] > 0 else "inverse",
+            )
 
-        # Danger zone shading
-        fig_tl.add_vrect(x0=0, x1=official_order_time,
-                          fillcolor="rgba(255,165,0,0.1)", line_width=0,
-                          annotation_text="Pre-order window", annotation_position="top left")
+        with res_r:
+            et = res["evac_times"]
+            events = [
+                ("Fire ignition",                  0),
+                ("Caregiver alert (if enrolled)",  res["caregiver_lead"]),
+                ("Official order (median)",        res["official_order_time"]),
+                ("You complete evacuation",
+                 res["official_order_time"] + et["total"] + res["no_bag_add"] + res["no_plan_add"]),
+            ]
+            fig_tl = go.Figure()
+            for i, (ev, t) in enumerate(events):
+                dot_c = "#FF4B4B" if t > res["official_order_time"] else (
+                    "#d4a017" if t > 0 else "#8b949e"
+                )
+                fig_tl.add_trace(go.Scatter(
+                    x=[t], y=[i],
+                    mode="markers+text",
+                    marker=dict(size=14, color=dot_c),
+                    text=[ev], textposition="middle right", showlegend=False,
+                ))
+            fig_tl.add_vrect(
+                x0=0, x1=res["official_order_time"],
+                fillcolor="rgba(212,160,23,0.08)", line_width=0,
+                annotation_text="Pre-order window", annotation_position="top left",
+            )
+            fig_tl.update_layout(
+                template="plotly_dark",
+                xaxis_title="Hours from ignition",
+                yaxis=dict(showticklabels=False, showgrid=False),
+                height=240,
+                margin=dict(l=20, r=160, t=10, b=30),
+            )
+            st.plotly_chart(fig_tl, use_container_width=True)
 
-        fig_tl.update_layout(
-            template="plotly_dark",
-            xaxis_title="Hours from Ignition",
-            yaxis=dict(showticklabels=False, showgrid=False),
-            height=280,
-            margin=dict(l=20, r=150, t=20, b=40),
-            title="Your Personal Evacuation Timeline"
-        )
-        st.plotly_chart(fig_tl, use_container_width=True)
-
-        # ── Specific recommendations ──
-        st.subheader("Your Action Plan")
-
+        # Recommendations — progressive disclosure
         recs = []
-        if not has_go_bag:
-            recs.append("**Pack a go-bag** — saves ~30 min when ordered to evacuate. Include medications, documents, 3 days clothes.")
-        if not has_evac_plan:
-            recs.append("**Write a route plan** — pre-identify 2 routes from your home to the nearest shelter. Saves ~15 min of decision time.")
-        if not has_alerts_on:
-            recs.append("**Enable Wireless Emergency Alerts** (Settings → Notifications → Emergency Alerts). Free, no app needed.")
-        if has_caregiver == "No" and county_svi >= 0.75:
-            recs.append("**Enroll in a caregiver network** — your high-SVI county means fires grow 17% faster. A caregiver alert adds ~45 min buffer.")
-        if nearby_dependents > 0:
-            recs.append(f"**Your {nearby_dependents} dependent(s) add ~{dependent_add*60:.0f} min** to evacuation. Start packing earlier than your household's official order threshold.")
-        if "Large" in pets_livestock:
-            recs.append("**Pre-arrange livestock transport** — large animals need a trailer and loading time. Identify a neighbor or service in advance.")
-        if net_buffer < 0:
-            recs.append(f"**Your evacuation takes longer than typical warning time.** Consider moving to less fire-prone area, or ensuring you have a caregiver alert enrolled.")
-        if distance_to_wui < 1.0:
-            recs.append("**You live within 1 mile of wildland** — this is WUI (Wildland-Urban Interface). Apply ember-resistant vents, clear 100ft defensible space.")
+        if not res["has_go_bag"]:
+            recs.append("Pack a go-bag — saves ~30 min at evacuation. Include medications, documents, 3 days of clothes.")
+        if not res["has_evac_plan"]:
+            recs.append("Write a route plan — identify 2 routes to the nearest shelter. Saves ~15 min of decision time.")
+        if not res["has_alerts_on"]:
+            recs.append("Enable Wireless Emergency Alerts in your phone settings. Free, no app needed.")
+        if res["has_caregiver"] == "No" and res["county_svi"] >= 0.75:
+            recs.append("Enroll in a caregiver network — high-SVI fires grow 17% faster; a caregiver alert adds ~45 min.")
+        if res["nearby_dependents"] > 0:
+            extra = res["dependent_add"] * 60
+            recs.append(f"Your {res['nearby_dependents']} dependent(s) add ~{extra:.0f} min. Start packing earlier than your official threshold.")
+        if "Large" in res["pets_livestock"]:
+            recs.append("Pre-arrange livestock transport — large animals need a trailer. Identify a neighbor or service now.")
+        if res["net_buffer"] < 0:
+            recs.append("Your evacuation takes longer than typical warning time. Ensure you have caregiver alert enrollment.")
+        if res["distance_to_wui"] < 1.0:
+            recs.append("You live within 1 mile of wildland (WUI). Apply ember-resistant vents and clear 100ft of defensible space.")
 
-        for rec in recs:
-            st.markdown(f"- {rec}")
+        if recs:
+            with st.expander("Your action recommendations", expanded=True):
+                for rec in recs:
+                    st.markdown(f"- {rec}")
+        else:
+            st.success(
+                "Preparation level is solid. Keep your go-bag updated seasonally "
+                "and review your route plan annually."
+            )
 
-        if not recs:
-            st.success("Your preparation level is solid. Keep go-bag updated seasonally and review your route plan annually.")
-
-        # ── Live fire check ──
-        if county_lat and county_lon:
-            st.divider()
-            st.subheader("Nearest Active Fire (Live Check)")
-            with st.spinner("Checking NASA FIRMS..."):
-                fires = get_nearest_fire_distance(county_lat, county_lon)
-            if fires:
-                closest_km = fires[0][2]
-                closest_mi = closest_km * 0.621
-                if closest_mi < 10:
-                    st.error(f"Active fire detected **{closest_mi:.1f} miles** from your county centroid — review evacuation status now.")
-                elif closest_mi < 50:
-                    st.warning(f"Active fire detected **{closest_mi:.1f} miles** from your county. Monitor conditions.")
+        # Live fire check — progressive disclosure
+        if res.get("county_lat") and res.get("county_lon"):
+            with st.expander("Check for nearby active fires (live NASA FIRMS)"):
+                with st.spinner("Checking NASA FIRMS..."):
+                    fires = get_nearest_fire_distance(res["county_lat"], res["county_lon"])
+                if fires:
+                    closest_mi = fires[0][2] * 0.621
+                    if closest_mi < 10:
+                        st.error(f"Active fire detected {closest_mi:.1f} miles from your county. Review evacuation status now.")
+                    elif closest_mi < 50:
+                        st.warning(f"Active fire detected {closest_mi:.1f} miles away. Monitor conditions.")
+                    else:
+                        st.success(f"Nearest active fire is {closest_mi:.1f} miles away. No immediate threat.")
                 else:
-                    st.success(f"Nearest active fire is **{closest_mi:.1f} miles** away. No immediate threat.")
-            else:
-                st.info("NASA FIRMS check unavailable — check firms.modaps.eosdis.nasa.gov directly.")
+                    st.info("NASA FIRMS check unavailable. Check firms.modaps.eosdis.nasa.gov directly.")
 
         st.caption(
-            "Risk score uses CDC SVI, WiDS 2021–2025 real fire timing data, and FEMA evacuation time estimates. "
-            "This tool provides guidance only. Always follow official evacuation orders."
+            "Risk score uses CDC SVI, WiDS 2021-2025 real fire timing data, and FEMA evacuation time estimates. "
+            "Guidance only — always follow official evacuation orders."
         )
+
+        # CTA at page bottom — Fitts's Law (thumb zone)
+        st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+        if st.button(
+            "Build My Evacuation Plan",
+            type="primary",
+            use_container_width=True,
+            key="risk_to_plan_cta",
+        ):
+            st.session_state.current_page = "Evacuation Plan"
+            st.rerun()

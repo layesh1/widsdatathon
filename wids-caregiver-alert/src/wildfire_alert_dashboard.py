@@ -43,6 +43,7 @@ os.chdir(src_dir)
 import streamlit as st
 
 from live_incident_feed import load_fire_data
+from ui_utils import caregiver_progress_html, data_source_badge
 from auth_supabase import (
     render_auth_page,
     render_user_profile_sidebar,
@@ -208,6 +209,121 @@ div[data-testid="stColumn"]:has(.ai-col-marker) {
     font-size: 0.7rem; color: #AA0000;
     cursor: pointer; white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════════════
+   NAV BUTTON STYLES
+   ══════════════════════════════════════════════════════ */
+section[data-testid="stSidebar"] .stButton > button {
+    text-align: left !important;
+    padding: 8px 14px !important;
+    font-size: 0.88rem !important;
+    margin-bottom: 2px !important;
+}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    border-left: 3px solid #AA0000 !important;
+    background: rgba(170, 0, 0, 0.07) !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   DARK THEME — 60-30-10 COLOR SYSTEM
+   60% deep navy bg | 30% slate surface | 10% red/amber accent
+   ══════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* App background */
+[data-testid="stAppViewContainer"] > .main,
+.main .block-container {
+    background-color: #0d1117 !important;
+}
+[data-testid="stDecoration"] { display: none !important; }
+[data-testid="stHeader"] {
+    background-color: #0d1117 !important;
+    border-bottom: 1px solid #30363d !important;
+}
+
+/* Body typography */
+html, body,
+[data-testid="stMarkdownContainer"] > p,
+[data-testid="stText"] > p {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+    color: #e6edf3;
+}
+h1, h2, h3, h4 {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    color: #e6edf3 !important;
+}
+code, pre { font-family: 'JetBrains Mono', monospace !important; }
+
+/* Metric containers — dark surface cards */
+[data-testid="metric-container"] {
+    background: #161b22 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 10px !important;
+    padding: 14px 16px !important;
+}
+[data-testid="stMetricValue"] {
+    color: #e6edf3 !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-weight: 700 !important;
+}
+[data-testid="stMetricLabel"] {
+    color: #8b949e !important;
+    font-size: 0.76rem !important;
+}
+
+/* Expanders — surface-raised bg */
+[data-testid="stExpander"] {
+    background: #161b22 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+[data-testid="stExpander"] summary {
+    color: #8b949e !important;
+    font-size: 0.83rem !important;
+}
+
+/* Inputs */
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-testid="stTextArea"] textarea {
+    background: #161b22 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* Tabs — active tab red underline */
+button[data-baseweb="tab"][aria-selected="true"] {
+    border-bottom-color: #FF4B4B !important;
+    color: #e6edf3 !important;
+}
+button[data-baseweb="tab"] { color: #8b949e !important; }
+
+/* Primary CTA buttons in main content — red */
+.main .stButton > button[kind="primary"] {
+    background: #FF4B4B !important;
+    border-color: #FF4B4B !important;
+    color: #fff !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-weight: 600 !important;
+    min-height: 44px !important;
+    border-radius: 8px !important;
+}
+
+/* Alert boxes */
+[data-testid="stAlert"] { border-radius: 8px !important; }
+
+/* Dataframe borders */
+[data-testid="stDataFrame"] {
+    border: 1px solid #30363d !important;
+    border-radius: 8px !important;
+}
+
+/* Captions */
+[data-testid="stCaptionContainer"] { color: #8b949e !important; }
+
+/* Dividers */
+hr { border-color: #30363d !important; }
 
 /* ── Governance cards ── */
 .gov-card {
@@ -486,31 +602,84 @@ with st.sidebar:
     st.divider()
 
     # ── Navigation ────────────────────────────────────────────────────────────
-    if role == "Emergency Worker":
-        pages = ["Command Dashboard", "Fire Predictor"]
-    elif role == "Caregiver/Evacuee":
-        pages = ["Start Here", "Evacuation Planner"]
-    else:
-        pages = [
-            "About", "Equity Analysis", "Risk Calculator",
-            "Impact Projection", "Coverage Analysis",
-            "Zone Duration", "Fire Predictor", "Data Governance",
-            "Signal Gap Analysis", "Temporal Fire Patterns",
-            "Silent Fire Tracker", "Channel Coverage",
-            "Hotspot Map (Gi*)", "County Drill-Down",
-            "IRWIN Linkage",
-        ]
+    _NAV_CONFIG = {
+        "Emergency Worker": [
+            ("Command",        "🚨", "Live incidents & evacuee tracker"),
+            ("Fire Forecast",  "🔥", "Fire spread prediction"),
+            ("At-Risk Zones",  "⚠️",  "Vulnerable population hotspots"),
+            ("Coverage Gaps",  "📡", "Where alerts may not reach"),
+            ("Resources",      "🏠", "Fire department directory"),
+        ],
+        "Caregiver/Evacuee": [
+            ("Am I Safe?",      "🗺️", "Active fires near your location"),
+            ("Evacuation Plan", "🏃", "Routes, shelters & checklists"),
+            ("Risk Calculator", "🧮", "Your personal risk profile"),
+            ("My County",       "📊", "Local fire stats for your area"),
+            ("Why This App?",   "💡", "Why official alerts aren't enough"),
+        ],
+        "Data Analyst": [
+            ("Overview",       "ℹ️",  "About this project"),
+            ("Signal Gap",     "📉", "Alert failure & silent fires"),
+            ("Equity & Risk",  "⚖️",  "Vulnerability analysis"),
+            ("Geographic",     "🗺️", "Hotspots, coverage & counties"),
+            ("Fire Patterns",  "📅", "Temporal & impact analysis"),
+            ("Technical",      "🔬", "Data quality & IRWIN linkage"),
+            ("Fire Predictor", "🔥", "ML fire spread forecast"),
+        ],
+    }
 
-    if "current_page" not in st.session_state or st.session_state.current_page not in pages:
-        st.session_state.current_page = pages[0]
+    nav_items = _NAV_CONFIG.get(role, _NAV_CONFIG["Data Analyst"])
+    valid_pages = [label for label, _, _ in nav_items]
 
-    for p in pages:
-        active = st.session_state.current_page == p
-        if st.button(p, key=f"nav_{p}", use_container_width=True,
-                     type="primary" if active else "secondary"):
-            st.session_state.current_page = p
-            log_page_visit(username, p)
+    if "current_page" not in st.session_state or st.session_state.current_page not in valid_pages:
+        st.session_state.current_page = valid_pages[0]
+
+    for label, icon, desc in nav_items:
+        active = st.session_state.current_page == label
+        display_label = f"{icon}  {label}"
+        if st.button(display_label, key=f"nav_{label}", use_container_width=True,
+                     type="primary" if active else "secondary",
+                     help=desc):
+            st.session_state.current_page = label
+            log_page_visit(username, label)
             st.rerun()
+
+    # ── Role-specific secondary controls ──────────────────────────────────────
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    if role == "Data Analyst":
+        with st.expander("Filters", expanded=False):
+            st.selectbox(
+                "State",
+                ["All States", "CA", "OR", "WA", "TX", "CO", "NM", "AZ", "MT", "ID", "NV", "FL"],
+                key="sidebar_state_filter",
+            )
+            st.slider("Year range", 2021, 2025, (2021, 2025), key="sidebar_year_range")
+
+    elif role == "Caregiver/Evacuee":
+        county_val = st.session_state.get("selected_county", "")
+        new_county = st.text_input(
+            "Your county",
+            value=county_val,
+            placeholder="e.g. Los Angeles, CA",
+            key="sidebar_county_input",
+        )
+        if new_county != county_val:
+            st.session_state.selected_county = new_county
+        # Progress indicator
+        has_risk = st.session_state.get("risk_calculated", False)
+        has_alerts = st.session_state.get("onboarded", False)
+        has_plan = st.session_state.get("evacuation_plan_loaded", False)
+        st.markdown(caregiver_progress_html(has_risk, has_alerts, has_plan), unsafe_allow_html=True)
+
+    elif role == "Emergency Worker":
+        with st.expander("Operational area", expanded=False):
+            st.selectbox(
+                "Region",
+                ["All", "West", "Southwest", "Southeast", "Northeast", "Midwest"],
+                key="sidebar_region",
+            )
+            st.toggle("Live data only", value=False, key="sidebar_live_only")
 
     st.divider()
 
@@ -793,21 +962,128 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ONBOARDING FIRST-RUN FLOW
+# Shown once per browser session for non-analyst roles.
+# ─────────────────────────────────────────────────────────────────────────────
+def _render_onboarding():
+    from ui_utils import page_header, render_card, section_header
+
+    if role == "Caregiver/Evacuee":
+        page_header("Welcome — let's set up your alert profile")
+        st.markdown(
+            "Answer three quick questions to see your personal wildfire risk. "
+            "This takes under a minute and nothing is shared."
+        )
+
+        step = st.session_state.get("onboard_step", 1)
+
+        if step == 1:
+            section_header("Step 1 of 3 — Your location")
+            county_input = st.text_input(
+                "Your county and state",
+                placeholder="e.g. Los Angeles, CA",
+                key="onboard_county",
+            )
+            if st.button("Next", type="primary", disabled=not county_input):
+                st.session_state.selected_county = county_input
+                st.session_state.onboard_step = 2
+                st.rerun()
+
+        elif step == 2:
+            section_header("Step 2 of 3 — Your household")
+            st.selectbox(
+                "Mobility level of your household",
+                ["Fully mobile", "Elderly / slow mobility", "Disabled, needs assistance",
+                 "No personal vehicle", "Medical equipment (O2, dialysis, etc.)"],
+                key="onboard_mobility",
+            )
+            st.number_input("Dependents needing help (children, elderly, disabled)", 0, 10, 0,
+                            key="onboard_dependents")
+            if st.button("Next", type="primary"):
+                st.session_state.onboard_step = 3
+                st.rerun()
+
+        elif step >= 3:
+            section_header("Step 3 of 3 — Know the risk")
+            h1, h2, h3 = st.columns(3)
+            with h1:
+                render_card("3 in 4 fires", "No public alert",
+                            "73% of wildfires happen with no official warning", "#FF4B4B")
+            with h2:
+                render_card("Median time to order", "1.1 hours",
+                            "From ignition to official evacuation order — if one comes at all", "#d4a017")
+            with h3:
+                render_card("Vulnerable county fires", "+17% faster spread",
+                            "High-SVI counties face faster-moving fires and fewer resources", "#d4a017")
+            st.markdown("")
+            st.markdown(
+                "This app monitors fire signals and helps you build a personalized evacuation plan. "
+                "Your county and household profile are used only within this session."
+            )
+            if st.button("Enter the app", type="primary", use_container_width=True):
+                st.session_state.onboarded = True
+                st.session_state.onboard_step = 1
+                st.rerun()
+
+    elif role == "Emergency Worker":
+        page_header("Welcome — set your operational area")
+        st.markdown(
+            "Select your primary region before loading the command dashboard. "
+            "This filters the incident feed and default map view."
+        )
+        region = st.selectbox(
+            "Primary operational region",
+            ["All", "West", "Southwest", "Southeast", "Northeast", "Midwest"],
+            key="onboard_region",
+        )
+        col_a, col_b = st.columns(2)
+        with col_a:
+            render_card("Active incidents", f"{len(fire_data):,}",
+                        fire_label, "#d4a017")
+        with col_b:
+            render_card("High-SVI counties at risk", "39.8%",
+                        "Share of WiDS fire events in vulnerable counties", "#FF4B4B")
+        st.markdown("")
+        if st.button("Enter Command Dashboard", type="primary", use_container_width=True):
+            st.session_state.sidebar_region = region
+            st.session_state.onboarded = True
+            st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PAGE ROUTER
 # ─────────────────────────────────────────────────────────────────────────────
 page = st.session_state.current_page
 
 
 def _render_page():
-    if page == "Command Dashboard":
+    # ── Emergency Worker ──────────────────────────────────────────────────────
+    if page == "Command":
         from command_dashboard_page import render_command_dashboard
         render_command_dashboard(fire_data, fire_source, fire_label)
 
-    elif page == "Start Here":
+    elif page == "Fire Forecast":
+        from fire_prediction_page import render_fire_prediction_page
+        render_fire_prediction_page(role=username)
+
+    elif page == "At-Risk Zones":
+        from dispatcher_risk_zones_page import render_dispatcher_risk_zones_page
+        render_dispatcher_risk_zones_page()
+
+    elif page == "Coverage Gaps":
+        from dispatcher_coverage_page import render_dispatcher_coverage_page
+        render_dispatcher_coverage_page()
+
+    elif page == "Resources":
+        from dispatcher_resources_page import render_dispatcher_resources_page
+        render_dispatcher_resources_page()
+
+    # ── Caregiver/Evacuee ─────────────────────────────────────────────────────
+    elif page == "Am I Safe?":
         from caregiver_start_page import render_caregiver_start_page
         render_caregiver_start_page()
 
-    elif page == "Evacuation Planner":
+    elif page == "Evacuation Plan":
         try:
             from evacuation_planner_page import render_evacuation_planner_page
             sig    = inspect.signature(render_evacuation_planner_page)
@@ -825,83 +1101,95 @@ def _render_page():
         except Exception as e:
             st.error(f"Evacuation Planner error: {e}")
 
-    elif page == "Safe Routes & Transit":
-        try:
-            from directions_page import render_directions_page
-            render_directions_page()
-        except SyntaxError as e:
-            st.error(f"directions_page.py syntax error (line {e.lineno}): {e.msg}")
-        except ImportError as e:
-            st.error(f"Safe Routes module not found: {e}")
-
-    elif page == "Equity Analysis":
-        try:
-            from equity_analysis_page import render_equity_analysis_page
-            render_equity_analysis_page()
-        except ImportError:
-            from real_data_insights import render_real_data_insights
-            render_real_data_insights()
-
     elif page == "Risk Calculator":
         from risk_calculator_page import render_risk_calculator_page
         render_risk_calculator_page()
 
-    elif page == "Impact Projection":
-        from impact_projection_page import render_impact_projection_page
-        render_impact_projection_page()
+    elif page == "My County":
+        from caregiver_county_page import render_caregiver_county_page
+        render_caregiver_county_page()
 
-    elif page == "Coverage Analysis":
-        from coverage_analysis_page import render_coverage_analysis_page
-        render_coverage_analysis_page()
+    elif page == "Why This App?":
+        from caregiver_why_page import render_caregiver_why_page
+        render_caregiver_why_page()
 
-    elif page == "Zone Duration":
-        from zone_duration_page import render_zone_duration_page
-        render_zone_duration_page()
+    # ── Data Analyst ──────────────────────────────────────────────────────────
+    elif page == "Overview":
+        _render_about()
+
+    elif page == "Signal Gap":
+        t1, t2 = st.tabs(["📉 Signal Gap Analysis", "🔇 Silent Fire Tracker"])
+        with t1:
+            from signal_gap_analysis_page import render_signal_gap_analysis
+            render_signal_gap_analysis()
+        with t2:
+            from silent_escalation_page import render_silent_escalation_page
+            render_silent_escalation_page()
+
+    elif page == "Equity & Risk":
+        t1, t2 = st.tabs(["⚖️ Equity Analysis", "📡 Coverage Analysis"])
+        with t1:
+            try:
+                from equity_analysis_page import render_equity_analysis_page
+                render_equity_analysis_page()
+            except ImportError:
+                from real_data_insights import render_real_data_insights
+                render_real_data_insights()
+        with t2:
+            from coverage_analysis_page import render_coverage_analysis_page
+            render_coverage_analysis_page()
+
+    elif page == "Geographic":
+        t1, t2, t3 = st.tabs(["🗺️ Hotspot Map", "📡 Channel Coverage", "🔍 County Drill-Down"])
+        with t1:
+            from hotspot_map_page import render_hotspot_map_page
+            render_hotspot_map_page()
+        with t2:
+            from channel_coverage_page import render_channel_coverage_page
+            render_channel_coverage_page()
+        with t3:
+            from county_drilldown_page import render_county_drilldown_page
+            render_county_drilldown_page()
+
+    elif page == "Fire Patterns":
+        t1, t2 = st.tabs(["📅 Temporal Patterns", "📈 Impact Projection"])
+        with t1:
+            from temporal_fire_pattern_page import render_temporal_fire_patterns
+            render_temporal_fire_patterns()
+        with t2:
+            from impact_projection_page import render_impact_projection_page
+            render_impact_projection_page()
+
+    elif page == "Technical":
+        t1, t2, t3 = st.tabs(["🔬 Data Governance", "🔗 IRWIN Linkage", "⏱️ Zone Duration"])
+        with t1:
+            from data_governance import render_data_governance
+            render_data_governance()
+        with t2:
+            from irwin_linkage_page import render_irwin_linkage_page
+            render_irwin_linkage_page()
+        with t3:
+            from zone_duration_page import render_zone_duration_page
+            render_zone_duration_page()
 
     elif page == "Fire Predictor":
         from fire_prediction_page import render_fire_prediction_page
         render_fire_prediction_page(role=username)
 
-    elif page == "About":
-        _render_about()
-
-    elif page == "Data Governance":
-        from data_governance import render_data_governance
-        render_data_governance()
-
-    elif page == "Signal Gap Analysis":
-        from signal_gap_analysis_page import render_signal_gap_analysis
-        render_signal_gap_analysis()
-
-    elif page == "Temporal Fire Patterns":
-        from temporal_fire_pattern_page import render_temporal_fire_patterns
-        render_temporal_fire_patterns()
-
-    elif page == "Silent Fire Tracker":
-        from silent_escalation_page import render_silent_escalation_page
-        render_silent_escalation_page()
-
-    elif page == "Channel Coverage":
-        from channel_coverage_page import render_channel_coverage_page
-        render_channel_coverage_page()
-
-    elif page == "Hotspot Map (Gi*)":
-        from hotspot_map_page import render_hotspot_map_page
-        render_hotspot_map_page()
-
-    elif page == "County Drill-Down":
-        from county_drilldown_page import render_county_drilldown_page
-        render_county_drilldown_page()
-
-    elif page == "IRWIN Linkage":
-        from irwin_linkage_page import render_irwin_linkage_page
-        render_irwin_linkage_page()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
-if st.session_state.show_ai_panel and st.session_state.ai_fullscreen:
+# ── Onboarding gate (non-analysts only, once per browser session) ─────────────
+_needs_onboarding = (
+    role != "Data Analyst"
+    and st.session_state.get("onboarded") is None
+)
+
+if _needs_onboarding:
+    _render_onboarding()
+
+elif st.session_state.show_ai_panel and st.session_state.ai_fullscreen:
     # Full screen AI — chips visible, no border needed
     _render_ai_panel(role, is_fullscreen=True, show_border=False)
 

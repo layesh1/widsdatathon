@@ -235,11 +235,20 @@ def render_caregiver_start_page():
         label_visibility="collapsed",
     )
 
-    st.title(_t("title", lang))
-    st.subheader(_t("subheader", lang))
+    st.markdown(
+        f"<h1 style='font-size:24px;font-weight:700;color:#e6edf3;"
+        f"border-bottom:1px solid #30363d;padding-bottom:12px;margin-bottom:4px;"
+        f"font-family:\"DM Sans\",system-ui,sans-serif'>"
+        f"{_t('title', lang)}</h1>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<p style='color:#8b949e;margin-bottom:0.8rem'>{_t('subheader', lang)}</p>",
+        unsafe_allow_html=True,
+    )
 
     # ── Real data warning banner ──────────────────────────────────────────────
-    st.info(_t("info_banner", lang), icon="⚠️")
+    st.info(_t("info_banner", lang))
 
     st.divider()
 
@@ -404,21 +413,19 @@ def render_caregiver_start_page():
                 else:
                     st.success(_t("confirm_success2", lang, name=confirm_name))
 
-    st.divider()
-
-    # ── Real data anchors ─────────────────────────────────────────────────────
-    st.subheader(_t("why_title", lang))
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric(_t("metric1_label", lang), "1.1h",
-              help="653 fires with confirmed evac actions, 2021–2025 WiDS dataset")
-    m2.metric(_t("metric2_label", lang), "32h",
-              delta="90th percentile",
-              delta_color="off",
-              help="1 in 10 fires takes over 32h to get an official order")
-    m3.metric(_t("metric3_label", lang), "260",
-              delta="39.8% of all WiDS fire events",
-              delta_color="off")
-    m4.metric(_t("metric4_label", lang), "11.7 ac/hr",
-              delta="+17% vs non-vulnerable",
-              delta_color="inverse")
-    st.caption(_t("data_caption", lang))
+    # ── Real data anchors — progressive disclosure ───────────────────────────
+    with st.expander(_t("why_title", lang), expanded=False):
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(_t("metric1_label", lang), "1.1h",
+                  help="653 fires with confirmed evac actions, 2021-2025 WiDS dataset")
+        m2.metric(_t("metric2_label", lang), "32h",
+                  delta="90th percentile",
+                  delta_color="off",
+                  help="1 in 10 fires takes over 32h to get an official order")
+        m3.metric(_t("metric3_label", lang), "260",
+                  delta="39.8% of all WiDS fire events",
+                  delta_color="off")
+        m4.metric(_t("metric4_label", lang), "11.7 ac/hr",
+                  delta="+17% vs non-vulnerable",
+                  delta_color="inverse")
+        st.caption(_t("data_caption", lang))
