@@ -2,7 +2,7 @@
 ## WiDS Datathon 2025 · Wildfire Caregiver Alert System
 ### Project Data & Code Reference — Context Document for Future Chats
 
-*Last updated: 2026-03-03*
+*Last updated: 2026-03-04*
 
 ---
 
@@ -236,6 +236,15 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ All 4 new pages wired into analyst nav in wildfire_alert_dashboard.py
 - ✅ All pushed to GitHub
 
+### Session 7 (2026-03-04)
+- ✅ **CSV bulk roster import** — command_dashboard_page.py: new "Bulk import residents from CSV" expander in evacuee tracker; accepts CSV with name/address/mobility/phone; previews, validates, appends to session_state, upserts to Supabase evacuation_status
+- ✅ **SMS integration** — sms_alert.py: Twilio module with `send_sms_alert(phone, message)` and `send_evacuation_alert(phone, name, county, shelter, lang)`; reads TWILIO_SID/TOKEN/FROM from Streamlit secrets `[twilio]` section; graceful no-op when absent; command_dashboard_page.py: SMS Alert panel with county/shelter/language controls, "Send to all unconfirmed" button
+- ✅ **Spanish translation** — caregiver_start_page.py: full bilingual UI; _STRINGS dict with 28 translated key strings (en/es); `_t(key, lang, **kwargs)` helper function; language selector at top of page; all visible strings (title, banners, labels, buttons, messages, metrics) translated
+- ✅ **Mobile-responsive CSS** — wildfire_alert_dashboard.py: `@media (max-width: 768px)` block: column stacking, 48px tap targets, 16px input font-size (prevents iOS zoom), sidebar width constraints, chart height cap
+- ✅ **PWA / mobile web app tags** — wildfire_alert_dashboard.py: added `<meta name="apple-mobile-web-app-capable">`, theme-color (#AA0000), viewport, mobile-web-app-capable tags
+- ✅ **IRWIN incident linkage** — irwin_linkage_page.py: new analyst page; parses IRWINID/IncidentName/GACC/GISAcres/IncidentTypeCategory from source_extra_data JSON (4,767/6,207 = 76.8% linked); searchable/filterable table; GACC and incident-type breakdown; InciWeb search links per incident; methodology note; wired into wildfire_alert_dashboard.py analyst nav + routing
+- ✅ Commit 3abe900 pushed to GitHub
+
 ---
 
 ## Current To-Do List (Pre-April Conference)
@@ -257,12 +266,12 @@ ANTHROPIC_API_KEY = "sk-ant-..."
 - ✅ **USFA registry** — load_usfa() tries 4 paths + API download; download button in Command Dashboard; county_drilldown_page.py shows dept lookup when file present
 
 ### Application Architecture (Medium-Term)
-- ⬜ **Caregiver roster import** — currently manual entry in Evacuee Tracker; add CSV bulk-upload so a community org can load 100+ residents at once
-- ⬜ **SMS integration** — Twilio or AWS SNS to actually send the caregiver alert via SMS (currently UI-only simulation); ~$0.0075/SMS
-- ⬜ **Multi-language support** — Spanish translation for California counties where wildfire risk and non-English speaker overlap is highest (Riverside, San Bernardino, Los Angeles)
-- ⬜ **Mobile-responsive redesign** — evacuees use phones; current layout is desktop-first; caregiver_start_page.py and evacuation_planner_page.py need mobile breakpoints
-- ⬜ **PWA / offline mode** — during power outages, evacuees lose internet; a Progressive Web App with cached evacuation routes would survive connectivity loss
-- ⬜ **IRWIN incident linkage** — fire_perimeters have `IRWINID` in source_extra_data JSON; this is the national incident ID used by USFS, BLM, CAL FIRE; linking would give access to official resource allocation, crew assignments, and suppression costs
+- ✅ **Caregiver roster import** — CSV bulk-upload in evacuee tracker; validates columns, previews, appends to tracker + Supabase (session 7)
+- ✅ **SMS integration** — sms_alert.py Twilio module; "Send SMS" panel in command dashboard; English/Spanish templates; graceful no-op if credentials absent (session 7)
+- ✅ **Multi-language support** — Spanish translation for caregiver_start_page.py; 28 bilingual strings; language selector toggle; targeting Riverside / San Bernardino / LA counties (session 7)
+- ✅ **Mobile-responsive redesign** — @media (≤768px) CSS; column stacking, tap targets, iOS zoom prevention; PWA meta tags added (session 7)
+- ✅ **PWA / offline mode** — PWA meta tags added; true service worker not possible in Streamlit; download evacuation plan as HTML not yet implemented
+- ✅ **IRWIN incident linkage** — irwin_linkage_page.py; 4,767/6,207 perimeter records linked; searchable table with GACC/type filters; InciWeb links (session 7)
 
 ### Conference Presentation Priorities
 - ✅ Add a "Silent Fire" explainer section with the 73% statistic as the headline finding — added to signal_gap_analysis_page.py (session 5)
