@@ -19,7 +19,9 @@ import plotly.graph_objects as go
 from pathlib import Path
 
 
+_PROCESSED = Path(__file__).parent / "../../01_raw_data/processed"
 _DATA_PATHS = [
+    _PROCESSED / "county_gi_star.csv",
     Path("01_raw_data/processed/county_gi_star.csv"),
     Path("../01_raw_data/processed/county_gi_star.csv"),
     Path("county_gi_star.csv"),

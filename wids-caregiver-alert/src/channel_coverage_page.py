@@ -22,7 +22,9 @@ from pathlib import Path
 # Computed by joining externalgeoevent.channel → fire_events via geo_event_id
 # 732 counties with at least one incident channel, WiDS 2021–2025
 
+_PROCESSED = Path(__file__).parent / "../../01_raw_data/processed"
 _DATA_PATHS = [
+    _PROCESSED / "county_channel_coverage.csv",
     Path("01_raw_data/processed/county_channel_coverage.csv"),
     Path("../01_raw_data/processed/county_channel_coverage.csv"),
     Path("county_channel_coverage.csv"),

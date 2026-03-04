@@ -19,6 +19,15 @@ import numpy as np
 from pathlib import Path
 
 
+_PROCESSED = Path(__file__).parent / "../../01_raw_data/processed"
+# Use pre-extracted irwin_incidents.csv (IRWIN fields only, no geometry column)
+_IRWIN_PATHS = [
+    _PROCESSED / "irwin_incidents.csv",
+    Path("01_raw_data/processed/irwin_incidents.csv"),
+    Path("../01_raw_data/processed/irwin_incidents.csv"),
+    Path("irwin_incidents.csv"),
+]
+# Full perimeter file as last-resort fallback (local dev only, 363MB)
 _PERIMETER_PATHS = [
     Path("01_raw_data/fire_perimeters_gis_fireperimeter.csv"),
     Path("../01_raw_data/fire_perimeters_gis_fireperimeter.csv"),
@@ -50,7 +59,26 @@ _INCIDENT_TYPE = {
 
 @st.cache_data(show_spinner=False)
 def load_irwin_data() -> pd.DataFrame:
-    """Load fire perimeters and parse IRWIN fields from source_extra_data."""
+    """Load IRWIN incident data — pre-processed CSV preferred, falls back to full perimeter file."""
+    # 1. Try the small pre-extracted CSV first (deployed on Streamlit Cloud)
+    for p in _IRWIN_PATHS:
+        if p.exists():
+            try:
+                df = pd.read_csv(p, low_memory=False)
+                # Already parsed — just add display columns
+                df["GACC_full"] = df["GACC"].fillna("").apply(lambda g: _GACC_FULL.get(g, g or "Unknown"))
+                df["IncidentType_full"] = df["IncidentTypeCategory"].fillna("").apply(
+                    lambda t: _INCIDENT_TYPE.get(t, t or "Unknown")
+                )
+                df["inciweb_url"] = df["IncidentName"].fillna("").apply(
+                    lambda n: f"https://inciweb.nwcg.gov/?s={n.replace(' ', '+')}" if n else ""
+                )
+                df["IRWINID"] = df["IRWINID"].fillna("")
+                return df
+            except Exception:
+                pass
+
+    # 2. Fall back to the raw 363MB perimeter file (local dev only)
     for p in _PERIMETER_PATHS:
         if p.exists():
             try:
@@ -58,7 +86,8 @@ def load_irwin_data() -> pd.DataFrame:
                 return _parse_irwin(df)
             except Exception:
                 pass
-    # No file found — return empty with expected columns
+
+    # 3. No file found — return empty with expected columns
     return pd.DataFrame(columns=[
         "id", "geo_event_id", "approval_status", "source",
         "source_incident_name", "source_acres", "date_created",
