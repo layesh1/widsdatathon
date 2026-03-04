@@ -246,9 +246,10 @@ cluster geographically — indicating a regional system failure, not just indivi
     # ── Hot spot table ────────────────────────────────────────────────────────
     st.divider()
     st.subheader("Hot Spot County Details")
-    hot_display = df[df["gi_star"] >= 1.282].sort_values("gi_star", ascending=False)[
-        ["county_name", "state", "gi_star", "svi_score", "pct_silent", "total_fires", "extreme_fires"]
-    ].copy()
+    _base_cols = ["county_name", "state", "gi_star", "svi_score", "pct_silent", "total_fires"]
+    if "extreme_fires" in df.columns:
+        _base_cols.append("extreme_fires")
+    hot_display = df[df["gi_star"] >= 1.282].sort_values("gi_star", ascending=False)[_base_cols].copy()
     if "extreme_fires" not in hot_display.columns:
         hot_display["extreme_fires"] = "—"
     hot_display = hot_display.rename(columns={
