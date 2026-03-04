@@ -127,6 +127,13 @@ def _render_login_form():
         password   = st.text_input("Password", type="password")
         submitted  = st.form_submit_button("Sign In", use_container_width=True)
 
+    # ── Forgot credentials toggle ──────────────────────────────────────────────
+    if st.button("Forgot username or password?", key="forgot_toggle_btn", type="secondary"):
+        st.session_state["show_forgot_form"] = not st.session_state.get("show_forgot_form", False)
+
+    if st.session_state.get("show_forgot_form"):
+        _render_forgot_credentials()
+
     if not submitted:
         return
 
@@ -163,6 +170,104 @@ def _render_login_form():
 
     except Exception as e:
         st.error(f"Sign in failed: {e}")
+
+
+# ── Forgot credentials ────────────────────────────────────────────────────────
+
+def _render_forgot_credentials():
+    """Inline account recovery panel shown below the sign-in form."""
+    st.markdown(
+        "<div style='margin-top:4px;padding:16px 18px;"
+        "background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);"
+        "border-radius:10px'>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("**Account Recovery**")
+
+    recovery_type = st.radio(
+        "I need to:",
+        ["Look up my username", "Reset my password"],
+        key="recovery_type_radio",
+        horizontal=True,
+    )
+
+    with st.form("forgot_form", clear_on_submit=True):
+        recovery_email = st.text_input(
+            "Email address on your account",
+            placeholder="The email you used when signing up",
+        )
+        col_sub, col_cancel = st.columns([3, 1])
+        with col_sub:
+            recovery_submitted = st.form_submit_button(
+                "Submit", use_container_width=True, type="primary"
+            )
+        with col_cancel:
+            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if cancelled:
+        st.session_state["show_forgot_form"] = False
+        st.rerun()
+
+    if recovery_submitted:
+        if not recovery_email.strip():
+            st.error("Please enter the email address on your account.")
+        else:
+            _handle_account_recovery(recovery_email.strip(), recovery_type)
+
+
+def _handle_account_recovery(email: str, recovery_type: str):
+    import secrets
+    import string
+
+    sb = get_supabase()
+    try:
+        res = (
+            sb.table("users")
+            .select("username")
+            .ilike("email", email)
+            .execute()
+        )
+    except Exception as e:
+        st.error(f"Account recovery failed: {e}")
+        return
+
+    if not res.data:
+        st.warning(
+            "No account found with that email address. "
+            "Check the spelling, or create a new account."
+        )
+        return
+
+    username = res.data[0]["username"]
+
+    if recovery_type == "Look up my username":
+        st.success(f"Your username is: **{username}**")
+
+    else:  # Reset password
+        alphabet = string.ascii_letters + string.digits
+        temp_pw  = "Tmp" + "".join(secrets.choice(alphabet) for _ in range(8))
+        salt     = _generate_salt()
+        hashed   = _hash_password(temp_pw, salt)
+
+        try:
+            sb.table("users").update({
+                "password_hash": hashed,
+                "password_salt": salt,
+            }).eq("username", username).execute()
+        except Exception as e:
+            st.error(f"Could not reset password: {e}")
+            return
+
+        _log_event(username, "PASSWORD_RESET", {"method": "self_service"})
+
+        st.success(f"Password reset for **{username}**. Your temporary password is:")
+        st.code(temp_pw, language=None)
+        st.caption(
+            "Sign in with this temporary password. "
+            "Update it in your account settings after logging in."
+        )
 
 
 # ── Signup ────────────────────────────────────────────────────────────────────
