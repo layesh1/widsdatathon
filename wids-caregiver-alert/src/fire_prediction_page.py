@@ -140,6 +140,120 @@ GROWTH_CURVES = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Plain-language caregiver guidance per FWI danger class
+# ---------------------------------------------------------------------------
+_CAREGIVER_GUIDANCE = {
+    "Low": {
+        "icon": "✅",
+        "headline": "Low fire danger — monitor conditions",
+        "color": "#3fb950",
+        "actions": [
+            "No immediate action needed. Stay informed via your county emergency alerts.",
+            "Good time to review your household evacuation plan and grab-and-go bag.",
+            "Check that vulnerable household members (elderly, disabled) know your meeting point.",
+        ],
+        "caregiver_note": (
+            "If you care for someone with limited mobility, this is the right time to "
+            "confirm transportation arrangements and medication supplies before conditions change."
+        ),
+    },
+    "Moderate": {
+        "icon": "⚠️",
+        "headline": "Moderate fire danger — stay alert",
+        "color": "#d4a017",
+        "actions": [
+            "Monitor local news and sign up for emergency alerts if you haven't already.",
+            "Know your evacuation zone (Zones A–D on most county maps) and your nearest shelter.",
+            "Check your vehicle fuel level and have an evacuation bag ready to grab within minutes.",
+        ],
+        "caregiver_note": (
+            "If caring for someone who needs assistance evacuating, contact them now to confirm "
+            "your communication plan. Identify a backup driver or transport resource."
+        ),
+    },
+    "High": {
+        "icon": "🟠",
+        "headline": "High fire danger — prepare to evacuate",
+        "color": "#FF9800",
+        "actions": [
+            "Be ready to leave on short notice. Pack medications, IDs, chargers, and water.",
+            "Know two exit routes from your neighborhood in case one is blocked by fire.",
+            "Avoid outdoor burning, mowing on dry grass, or parking on dry vegetation.",
+        ],
+        "caregiver_note": (
+            "Alert dependent household members now. If they need help evacuating, "
+            "arrange transportation before an official order — waits can be dangerous at "
+            "High danger levels when spread can outpace official response."
+        ),
+    },
+    "Very High": {
+        "icon": "🔴",
+        "headline": "Very High fire danger — be ready to leave immediately",
+        "color": "#FF4B4B",
+        "actions": [
+            "Load your vehicle now with essentials. Stay close to home and avoid commitments far away.",
+            "Keep your phone charged and alerts enabled. If an Advisory or Warning is issued, go.",
+            "Check on neighbors or family members who may need help evacuating.",
+        ],
+        "caregiver_note": (
+            "Our data shows the median time from fire detection to evacuation order is only "
+            "1.1 hours for evacuation orders — but 73.5% of fires never trigger any official alert. "
+            "Do not wait for an official order if you or someone you care for has mobility needs. "
+            "Leave early when conditions are Very High."
+        ),
+    },
+    "Extreme": {
+        "icon": "🚨",
+        "headline": "EXTREME fire danger — leave NOW if in a fire-prone area",
+        "color": "#AA0000",
+        "actions": [
+            "Do not wait for an official evacuation order. Evacuate immediately if you are in a "
+            "wildland-urban interface or known fire risk zone.",
+            "Take medications, documents, and water. Leave pets in carriers.",
+            "Call 911 only for life-threatening emergencies — lines may be overloaded.",
+        ],
+        "caregiver_note": (
+            "Extreme conditions mean fires can double in size every hour. "
+            "The WiDS dataset shows 70.8% of extreme-spread fires received NO evacuation action. "
+            "If you care for someone with limited mobility, leave now — do not wait for official orders."
+        ),
+    },
+}
+
+
+def _render_caregiver_action_box(dlabel: str, fwi: float):
+    """Render a plain-language 'What should I do?' box for the given FWI danger class."""
+    g = _CAREGIVER_GUIDANCE.get(dlabel, _CAREGIVER_GUIDANCE["Moderate"])
+    color = g["color"]
+    icon = g["icon"]
+    headline = g["headline"]
+
+    st.markdown(
+        f"<div style='background:{color}18;border:1.5px solid {color};"
+        f"border-radius:8px;padding:14px 18px;margin:12px 0'>"
+        f"<div style='font-size:1.15rem;font-weight:700;color:{color};margin-bottom:8px'>"
+        f"{icon} {headline}</div>"
+        f"<p style='font-size:0.82rem;color:#888;margin:0 0 6px'>FWI = {fwi:.1f} ({dlabel})</p>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_a, col_b = st.columns([3, 2])
+    with col_a:
+        st.markdown("**Actions to take now:**")
+        for action in g["actions"]:
+            st.markdown(f"- {action}")
+    with col_b:
+        st.markdown("**If you care for someone vulnerable:**")
+        st.info(g["caregiver_note"])
+    st.caption(
+        "Source: WiDS 2025 dataset (n=62,696 fire incidents, 2021–2025). "
+        "Evacuation timing statistics from fire_events_with_svi_and_delays.csv. "
+        "FWI thresholds per Van Wagner & Pickett (1985)."
+    )
+
+
 # ===========================================================================
 # API helpers
 # ===========================================================================
@@ -650,6 +764,8 @@ def _render_spot_fire_spread():
         unsafe_allow_html=True,
     )
 
+    _render_caregiver_action_box(dlabel, fwi)
+
     # -----------------------------------------------------------------------
     # Spread rate summary
     # -----------------------------------------------------------------------
@@ -843,6 +959,8 @@ def _render_weather_aqi():
             f" &nbsp;&mdash;&nbsp; FWI = {fwi:.1f}</div>",
             unsafe_allow_html=True,
         )
+
+        _render_caregiver_action_box(dlabel, fwi)
 
         if H < 15 and W_mph > 25:
             st.error("Red Flag conditions: humidity below 15% with winds above 25 mph.")

@@ -512,3 +512,39 @@ The 73% statistic is the central equity argument: **the system is already failin
     before official orders — gives vulnerable populations the lead time they need
     to arrange accessible transportation, secure medical equipment, and safely evacuate.
     """)
+
+    # ── Export summary (Kaggle / writeup) ─────────────────────────────────────
+    st.divider()
+    with st.expander("📊 Download Analysis Summary (for writeup / Kaggle)", expanded=False):
+        st.caption("Export the key verified statistics from this analysis as a structured CSV.")
+        summary_rows = [
+            {"category": "Dataset",          "metric": "Total fire incidents",               "value": "62,696",    "source": "fire_events_with_svi_and_delays.csv"},
+            {"category": "Dataset",          "metric": "Date range",                          "value": "2021–2025", "source": "date_created column"},
+            {"category": "Signal Gap",       "metric": "Fires with early detection signal",   "value": "41,906",    "source": "v_dashboard_kpis"},
+            {"category": "Signal Gap",       "metric": "Pct receiving no evacuation action",  "value": "99.74%",    "source": "v_dashboard_kpis"},
+            {"category": "Signal Gap",       "metric": "Median signal-to-action delay",       "value": "3.5 hours", "source": "v_dashboard_kpis"},
+            {"category": "Signal Gap",       "metric": "P90 signal-to-action delay",          "value": "100.3 hours","source": "v_dashboard_kpis"},
+            {"category": "Notification",     "metric": "Silent fires (no public alert)",      "value": "46,053 (73.5%)", "source": "notification_type column"},
+            {"category": "Notification",     "metric": "Normal fires (public notification)",  "value": "16,643 (26.5%)", "source": "notification_type column"},
+            {"category": "Evacuation Tiers", "metric": "Fires with evacuation order",         "value": "653",       "source": "first_order_at not null"},
+            {"category": "Evacuation Tiers", "metric": "Median hours to evacuation order",    "value": "1.10h",     "source": "hours_to_order, n=653"},
+            {"category": "Evacuation Tiers", "metric": "Median hours to evacuation warning",  "value": "1.50h",     "source": "hours_to_warning, n=715"},
+            {"category": "Evacuation Tiers", "metric": "Median hours to evacuation advisory", "value": "6.21h",     "source": "hours_to_advisory, n=356"},
+            {"category": "Extreme Fires",    "metric": "Extreme-spread fires total",          "value": "298",       "source": "last_spread_rate == 'extreme'"},
+            {"category": "Extreme Fires",    "metric": "Extreme fires with no evac action",   "value": "211 (70.8%)", "source": "last_spread_rate + evacuation_occurred"},
+            {"category": "Equity",           "metric": "High-SVI fire share",                 "value": "39.8%",     "source": "svi_score >= 0.75"},
+            {"category": "Equity",           "metric": "SVI sub-theme strongest correlation", "value": "svi_minority (-0.233)", "source": "Pearson corr. with evacuation_delay_hours"},
+            {"category": "Equity",           "metric": "High-SVI vs low-SVI delay gap",       "value": "11.5 hours","source": "median hours_to_order by SVI quartile"},
+            {"category": "Fire Perimeters",  "metric": "Total perimeter records",             "value": "6,207",     "source": "IRWIN/WiDS perimeter dataset"},
+            {"category": "Fire Perimeters",  "metric": "Approved perimeters",                 "value": "4,139 (66.7%)", "source": "status == 'approved'"},
+        ]
+        summary_df = pd.DataFrame(summary_rows)
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        csv_bytes = summary_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download as CSV",
+            data=csv_bytes,
+            file_name="wids2025_signal_gap_findings.csv",
+            mime="text/csv",
+            type="primary",
+        )

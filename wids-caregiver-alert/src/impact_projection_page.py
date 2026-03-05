@@ -168,11 +168,45 @@ def render_impact_projection_page():
     st.title("Impact Projection")
     st.caption("All projections are anchored to real WiDS 2021–2025 baseline data and published evacuation mortality literature.")
 
+    # ── Methodological transparency note ──────────────────────────────────
+    st.info(
+        "**About these projections:** This page combines **verified statistics** from the WiDS "
+        "2021–2025 dataset (62,696 fire incidents) with **illustrative scale estimates** for "
+        "national population at risk. The 2.8M population figure and the 71% alert gap are "
+        "modeled estimates — adjust the sliders below to explore the full uncertainty range. "
+        "The delay-reduction model above uses only real WiDS data."
+    )
+
+    with st.expander("What's verified vs. what's estimated", expanded=False):
+        st.markdown("""
+**Verified from WiDS 2021–2025 dataset** ✅
+| Statistic | Value | Source |
+|-----------|-------|--------|
+| Total fire incidents | 62,696 | fire_events_with_svi_and_delays.csv |
+| Fires with evacuation actions | 653 | Confirmed from first_order_at column |
+| Silent fires (no official alert) | 46,053 (73.5%) | notification_type == 'silent' |
+| Median delay: signal→order | 1.1 hours | hours_to_order, n=653 |
+| P90 delay: signal→order | 100.3 hours | 90th percentile |
+| High-SVI fire share | 39.8% | svi_score ≥ 0.75 |
+| Extreme-spread fires with no evac action | 70.8% (211/298) | last_spread_rate + evacuation_occurred |
+
+**Illustrative scale estimates** ⚠️ *(adjust sliders to test sensitivity)*
+| Estimate | Value | Basis |
+|----------|-------|-------|
+| High-vulnerability residents in WUI zones | **2.8M** | 2020 Census WUI × CDC SVI ≥ 0.75 overlap — **pending published literature citation** |
+| Share without proactive caregiver alerts | **71%** | Inferred from single-channel coverage data — **pending external validation** |
+| Baseline evac failure rate | 0.17% | Camp Fire 2018 empirical (85 deaths / 50k zone residents) |
+| Departure advance time per alert | 0.85h | FEMA 2019 IPAWS study |
+
+*Because the 2.8M population and 71% alert gap are unconfirmed, treat all "lives saved" figures as
+scenario estimates for planning purposes, not point predictions.*
+        """)
+
     # ── Improvement 5: Delay reduction model (shown first) ──────────────────
     _render_delay_reduction_section()
 
     # ── Data source disclosure ──
-    with st.expander("Data sources & methodology", expanded=False):
+    with st.expander("Data sources & full methodology", expanded=False):
         st.markdown("""
         **Baseline statistics** come directly from `fire_events_with_svi_and_delays.csv` (653 fires with confirmed evacuation actions, 2021–2025 WiDS dataset).
 
@@ -185,7 +219,10 @@ def render_impact_projection_page():
         **Alert time savings**: FEMA 2019 Integrated Public Alert and Warning System (IPAWS) study found proactive
         caregiver-directed alerts moved departure 45–90 min earlier vs. official-order-only notifications.
 
-        **Population at risk**: 2020 Census WUI (Wildland-Urban Interface) overlap with CDC SVI ≥ 0.75 counties.
+        **Population at risk (2.8M estimate)**: Derived by overlapping 2020 Census Wildland-Urban Interface
+        boundaries with CDC SVI ≥ 0.75 counties. This estimate has not been independently verified against
+        published WUI population literature — treat as illustrative. Slide the population input below to
+        test sensitivity from 0.5M to 6M.
         """)
 
     # ── Sliders ──

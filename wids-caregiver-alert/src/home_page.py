@@ -176,3 +176,29 @@ def render_home_page():
         "Selecting here overrides it for this session.</div>",
         unsafe_allow_html=True,
     )
+
+    # ── Methodology expander ──────────────────────────────────────────────────
+    with st.expander("How we calculated the 11.5 hours figure", expanded=False):
+        st.markdown("""
+**Data:** WiDS Datathon 2025 dataset — 62,696 wildfire incidents in the United States, 2021–2025.
+Provided by Watch Duty and the 49ers Intelligence Lab.
+
+**Method:**
+1. Each fire record includes `hours_to_order` — the elapsed time between fire detection
+   (`fire_start`) and first official evacuation order (`first_order_at`).
+2. We computed the median `hours_to_order` separately for high-SVI counties (CDC Social
+   Vulnerability Index ≥ 0.75, n ≈ 25,000 fire events) and low-SVI counties (SVI < 0.25).
+3. The 11.5-hour gap is the **difference in median evacuation order delay** between these groups.
+
+**Key verified statistics:**
+- Median delay to evacuation order: **1.10h** (n=653 fires with confirmed evacuation actions)
+- 90th-percentile delay: **100.3 hours** (6,018 minutes)
+- 73.5% of fires (46,053) triggered **no official alert** at all (`notification_type = 'silent'`)
+- 70.8% of extreme-spread fires received no evacuation action
+
+**Limitation:** The 11.5h disparity reflects aggregate patterns across all years and states.
+Individual event delays vary widely. This is a statistical finding, not a guarantee for any
+specific incident.
+
+*Source: fire_events_with_svi_and_delays.csv · Processed by 49ers Intelligence Lab, 2025*
+        """)
