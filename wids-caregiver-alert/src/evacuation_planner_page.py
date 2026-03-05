@@ -547,7 +547,8 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
             key="address_input",
         )
     with col2:
-        search_button = st.button("Find Shelters", type="primary")
+        st.markdown('<div style="height:28px"></div>', unsafe_allow_html=True)
+        search_button = st.button("Find Shelters", type="primary", use_container_width=True)
 
     if search_button and address:
         st.session_state.search_triggered = True
