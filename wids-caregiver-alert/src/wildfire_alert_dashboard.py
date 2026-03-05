@@ -242,16 +242,14 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
     border-bottom: 1px solid #30363d !important;
 }
 
-/* Body typography */
+/* Body typography — color set by config.toml theme, not overridden here */
 html, body,
 [data-testid="stMarkdownContainer"] > p,
 [data-testid="stText"] > p {
     font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
-    color: #e6edf3;
 }
 h1, h2, h3, h4 {
     font-family: 'DM Sans', system-ui, sans-serif !important;
-    color: #e6edf3 !important;
 }
 code, pre { font-family: 'JetBrains Mono', monospace !important; }
 
@@ -263,7 +261,6 @@ code, pre { font-family: 'JetBrains Mono', monospace !important; }
     padding: 14px 16px !important;
 }
 [data-testid="stMetricValue"] {
-    color: #e6edf3 !important;
     font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
 }
@@ -296,9 +293,7 @@ code, pre { font-family: 'JetBrains Mono', monospace !important; }
 /* Tabs — active tab red underline */
 button[data-baseweb="tab"][aria-selected="true"] {
     border-bottom-color: #FF4B4B !important;
-    color: #e6edf3 !important;
 }
-button[data-baseweb="tab"] { color: #8b949e !important; }
 
 /* Primary CTA buttons in main content — red */
 .main .stButton > button[kind="primary"] {
