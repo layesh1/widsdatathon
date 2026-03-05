@@ -3,7 +3,7 @@ risk_calculator_page.py
 Real, actionable risk calculator for caregivers and emergency workers.
 Uses:
   - CDC SVI component data (RPL_THEME1-4, E_AGE65, E_DISABL, E_NOVEH, E_POV150)
-  - WiDS real fire timing data (1.1h median, 32h P90, 17% growth differential)
+  - WiDS real fire timing data (1.1h median, 100.3h P90, 17% growth differential)
   - FEMA and Red Cross evacuation time estimates by mobility level
   - NASA FIRMS for current fire proximity
 Outputs: Personalized risk score + specific action timeline
@@ -21,7 +21,7 @@ from datetime import datetime
 
 # ── Real constants from WiDS data ────────────────────────────────────────────
 MEDIAN_EVAC_ORDER_H  = 1.1
-P90_EVAC_ORDER_H     = 32.0
+P90_EVAC_ORDER_H     = 100.3  # 6,018 min / 60 from WiDS CSV
 VULNERABLE_GROWTH_MULTIPLIER = 1.17  # 17% faster in high-SVI counties
 
 # ── FEMA evacuation time estimates by mobility/situation ─────────────────────
@@ -144,8 +144,8 @@ def render_risk_calculator_page():
     with h3:
         render_card(
             "Worst-case delay (90th percentile)",
-            "32 hours",
-            "1 in 10 fires gets no evacuation order for over a day",
+            "100 hours",
+            "1 in 10 fires takes over 100 hours to get an evacuation order (P90)",
             "#FF4B4B",
         )
 

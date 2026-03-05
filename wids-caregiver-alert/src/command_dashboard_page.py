@@ -236,8 +236,8 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
     h1, h2, h3, h4 = st.columns(4)
     h1.metric("Median Time to Evac Order",  "1.1h",
               help="653 fires with confirmed evac actions, 2021–2025")
-    h2.metric("Worst-Case (90th %ile)",     "32h",
-              help="1 in 10 fires takes over 32h to get an official order")
+    h2.metric("Worst-Case (90th %ile)",     "100h",
+              help="1 in 10 fires takes over 100 hours (4+ days) to get an official order (P90 = 6,018 min)")
     h3.metric("Fires Exceeding 6h",         "20%",    delta="critical window", delta_color="inverse")
     h4.metric("Vuln County Growth Rate",    "11.7 ac/hr", delta="+17% vs non-vuln", delta_color="inverse")
 

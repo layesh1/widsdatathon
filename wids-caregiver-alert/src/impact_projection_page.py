@@ -13,7 +13,7 @@ from pathlib import Path
 
 # ── Real baseline constants derived from fire_events_with_svi_and_delays.csv ──
 REAL_MEDIAN_DELAY_H    = 1.1    # hours, real WiDS data
-REAL_P90_DELAY_H       = 32.0   # hours, real WiDS data
+REAL_P90_DELAY_H       = 100.3  # hours, real WiDS data (6,018 min / 60)
 REAL_FIRES_WITH_EVAC   = 653    # fires in dataset with confirmed evac actions
 REAL_HIGH_VUL_PCT      = 0.398  # 39.8% of fire events in high-SVI counties
 REAL_GROWTH_DIFF_PCT   = 0.17   # 17% faster growth in vulnerable counties
@@ -294,7 +294,8 @@ def render_impact_projection_page():
     for a in adoption_range:
         p_reached = vul_pop_scope * 1_000_000 * a
         p_fail_w  = max(pct_who_fail_without * (1 - (alert_lead_time / REAL_P90_DELAY_H) * 3), 0.02)
-        at_risk_w = p_reached * p_fail_w + (vul_pop_scale := vul_pop_scope * 1_000_000 - p_reached) * pct_who_fail_without
+        vul_pop_remaining = vul_pop_scope * 1_000_000 - p_reached
+        at_risk_w = p_reached * p_fail_w + vul_pop_remaining * pct_who_fail_without
         lives_curve.append((deaths_baseline - at_risk_w * mortality_rate))
 
     fig = go.Figure()

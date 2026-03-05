@@ -558,7 +558,7 @@ working on the 49ers Intelligence Lab WiDS 2025 project: Wildfire Evacuation Ale
 {_PRIVACY_BLOCK}
 PROJECT CONTEXT:
 - Predicts evacuation risk for vulnerable populations during wildfires
-- Key stats: median delay 1.1h, P90 delay 32h, 653 fires with evac actions,
+- Key stats: median delay 1.1h, P90 delay 100.3h, 653 fires with evac actions,
   39.8% in high-SVI counties, 17% faster growth in vulnerable counties
 - Stack: Python, Streamlit, Supabase, Cox survival analysis, Getis-Ord Gi* hotspot detection
 DATA GOVERNANCE:
@@ -745,7 +745,7 @@ evacuation delays during wildfires, and can a data-driven alert system reduce th
 | Fires analyzed | 62,696 |
 | With confirmed evacuation actions | 653 |
 | Median time to evacuation order | **1.1 hours** |
-| 90th-percentile delay | **32 hours** |
+| 90th-percentile delay | **100 hours** |
 | High-SVI fire events | **39.8%** |
 | Growth rate — vulnerable counties | **11.71 ac/hr (+17%)** |
 """)

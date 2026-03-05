@@ -227,7 +227,7 @@ def render_real_data_insights():
         **What +17% faster growth means in practice:**
         - At 1.1h median order time: vuln county fire = **~13 acres** vs 11 acres non-vuln
         - At 6h (20% of fires): vuln county = **~70 acres** vs 60 acres
-        - At 32h P90: vuln county = **~375 acres** vs 320 acres
+        - At 100h P90: vuln county = **~1,170 acres** vs 1,000 acres
 
         Vulnerable populations face both slower evacuation capability *and* faster fires —
         a compounding gap this alert system directly targets.

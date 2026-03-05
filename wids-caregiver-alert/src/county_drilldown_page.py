@@ -151,10 +151,10 @@ def render_county_drilldown_page():
     county_name = row["county_name"]
     state = row.get("state", "")
     # Derive n_evac from total_fires × pct_evac when column not present
-    if "n_evac" not in fire_df.columns:
-        n_evac_computed = int(round(row.get("total_fires", 0) * row.get("pct_evac", 0)))
+    if "n_evac" in fire_df.columns:
+        n_evac_computed = int(row.get("n_evac", 0) or 0)
     else:
-        n_evac_computed = n_evac_computed
+        n_evac_computed = int(round(row.get("total_fires", 0) * row.get("pct_evac", 0)))
 
     # ── Header row ────────────────────────────────────────────────────────────
     st.divider()

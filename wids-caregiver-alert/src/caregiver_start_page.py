@@ -804,10 +804,10 @@ def render_caregiver_start_page():
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(_t("metric1_label", lang), "1.1h",
                   help="653 fires with confirmed evac actions, 2021-2025 WiDS dataset")
-        m2.metric(_t("metric2_label", lang), "32h",
+        m2.metric(_t("metric2_label", lang), "100h",
                   delta="90th percentile",
                   delta_color="off",
-                  help="1 in 10 fires takes over 32h to get an official order")
+                  help="1 in 10 fires takes over 100 hours to get an official order (P90 = 6,018 min, WiDS data)")
         m3.metric(_t("metric3_label", lang), "260",
                   delta="39.8% of all WiDS fire events",
                   delta_color="off")
