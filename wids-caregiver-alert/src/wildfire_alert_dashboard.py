@@ -518,6 +518,22 @@ STRICT RULES — NON-NEGOTIABLE:
    for any life-safety decisions.
 """
 
+_SAFE_PATH_PROMPT = f"""You are SAFE-PATH, a calm and supportive AI advisory assistant helping caregivers
+and evacuees during wildfire emergencies. You are part of the 49ers Intelligence Lab system.
+{_PRIVACY_BLOCK}
+PURPOSE: Help everyday people understand evacuation zones, what to do, and how to prepare —
+especially those caring for elderly, disabled, or medically dependent family members.
+ADVISORY GUIDANCE AREAS:
+- Evacuation zone explanations (Zone A = leave NOW, Zone B = prepare, Zone C = monitor)
+- Go-bag preparation: medications, documents, chargers, water, pet supplies
+- How to request evacuation assistance for mobility-limited individuals
+- Nearest shelter categories and how to find them via official sources
+- Caregiver-specific planning for medical equipment, oxygen, dialysis needs
+RESPONSE STYLE:
+- Plain language, numbered steps, warm and calm tone.
+- If someone describes immediate danger: advise them to call 911 first, immediately.
+"""
+
 _PERSONA_MAP = {
     "Emergency Worker": (
         "EVAC-OPS", "",
@@ -537,23 +553,19 @@ RESPONSE STYLE:
 """,
         ["Active evacuation zones?", "Draft a SITREP", "High-risk ZIP codes", "Resource advisory"],
     ),
+    "Evacuee": (
+        "SAFE-PATH", "",
+        _SAFE_PATH_PROMPT,
+        ["Am I in danger?", "What's in a go-bag?", "Zone A vs Zone B", "Nearest shelter"],
+    ),
+    "Caregiver": (
+        "SAFE-PATH", "",
+        _SAFE_PATH_PROMPT,
+        ["Is my person in danger?", "Help for wheelchair users", "Send an alert", "Nearest shelter"],
+    ),
     "Caregiver/Evacuee": (
         "SAFE-PATH", "",
-        f"""You are SAFE-PATH, a calm and supportive AI advisory assistant helping caregivers
-and evacuees during wildfire emergencies. You are part of the 49ers Intelligence Lab system.
-{_PRIVACY_BLOCK}
-PURPOSE: Help everyday people understand evacuation zones, what to do, and how to prepare —
-especially those caring for elderly, disabled, or medically dependent family members.
-ADVISORY GUIDANCE AREAS:
-- Evacuation zone explanations (Zone A = leave NOW, Zone B = prepare, Zone C = monitor)
-- Go-bag preparation: medications, documents, chargers, water, pet supplies
-- How to request evacuation assistance for mobility-limited individuals
-- Nearest shelter categories and how to find them via official sources
-- Caregiver-specific planning for medical equipment, oxygen, dialysis needs
-RESPONSE STYLE:
-- Plain language, numbered steps, warm and calm tone.
-- If someone describes immediate danger: advise them to call 911 first, immediately.
-""",
+        _SAFE_PATH_PROMPT,
         ["What's in a go-bag?", "Zone A vs Zone B", "Help for wheelchair users", "Nearest shelter"],
     ),
     "Data Analyst": (
@@ -1020,9 +1032,44 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
 # ─────────────────────────────────────────────────────────────────────────────
 def _render_onboarding():
     from ui_utils import page_header, render_card, section_header
-    from user_profile import render_profile_setup, render_evacuee_setup, get_caregiver_evacuee
+    from user_profile import (
+        render_profile_setup, render_evacuee_setup,
+        get_caregiver_evacuee, profile_complete,
+    )
 
-    if role in ("Evacuee", "Caregiver", "Caregiver/Evacuee"):
+    if role == "Caregiver":
+        # Step 1 — Caregiver's own profile
+        if st.session_state.get("onboarded") != "step1" and not profile_complete():
+            render_profile_setup(role="Caregiver", onboarded_value="step1")
+            return
+
+        # Step 2 — Who are they caring for?
+        evacuee = get_caregiver_evacuee()
+        if not evacuee.get("address") and not st.session_state.get("caregiver_evacuee_skipped"):
+            st.markdown(
+                "<div style='font-size:0.75rem;color:#8b949e;margin-bottom:0.5rem'>"
+                "Step 2 of 2</div>"
+                "<div style='font-size:1.4rem;font-weight:700;margin-bottom:0.25rem'>"
+                "Who are you caring for?</div>"
+                "<div style='font-size:0.9rem;color:#8b949e;margin-bottom:1.5rem'>"
+                "Enter the person you care for so you can monitor their fire risk "
+                "and send evacuation alerts when needed.</div>",
+                unsafe_allow_html=True,
+            )
+            render_evacuee_setup()
+            st.divider()
+            if st.button("Skip for now — I'll add this later", key="skip_evacuee_onboard"):
+                st.session_state.caregiver_evacuee_skipped = True
+                st.session_state.onboarded = True
+                st.rerun()
+            return
+
+        # Both steps complete
+        st.session_state.onboarded = True
+        st.rerun()
+        return
+
+    elif role in ("Evacuee", "Caregiver/Evacuee"):
         render_profile_setup(role=role)
         return
 
@@ -1098,7 +1145,7 @@ def _render_page():
     # ── Evacuee (unified single-address flow) ─────────────────────────────────
     elif page in ("My Safety", "My Plan", "My Risk"):
         from evacuee_dashboard import render_evacuee_dashboard
-        render_evacuee_dashboard(fire_data=fire_data)
+        render_evacuee_dashboard(fire_data=fire_data, focus=page)
 
     # ── Caregiver ─────────────────────────────────────────────────────────────
     elif page == "My Evacuee":
@@ -1145,7 +1192,7 @@ def _render_page():
         _render_about()
 
     elif page == "Signal Gap":
-        t1, t2 = st.tabs(["📉 Signal Gap Analysis", "🔇 Silent Fire Tracker"])
+        t1, t2 = st.tabs(["Signal Gap Analysis", "Silent Fire Tracker"])
         with t1:
             from signal_gap_analysis_page import render_signal_gap_analysis
             render_signal_gap_analysis()
@@ -1154,7 +1201,7 @@ def _render_page():
             render_silent_escalation_page()
 
     elif page == "Equity & Risk":
-        t1, t2 = st.tabs(["⚖️ Equity Analysis", "📡 Coverage Analysis"])
+        t1, t2 = st.tabs(["Equity Analysis", "Coverage Analysis"])
         with t1:
             try:
                 from equity_analysis_page import render_equity_analysis_page
@@ -1167,7 +1214,7 @@ def _render_page():
             render_coverage_analysis_page()
 
     elif page == "Geographic":
-        t1, t2, t3 = st.tabs(["🗺️ Hotspot Map", "📡 Channel Coverage", "🔍 County Drill-Down"])
+        t1, t2, t3 = st.tabs(["Hotspot Map", "Channel Coverage", "County Drill-Down"])
         with t1:
             from hotspot_map_page import render_hotspot_map_page
             render_hotspot_map_page()
@@ -1179,7 +1226,7 @@ def _render_page():
             render_county_drilldown_page()
 
     elif page == "Fire Patterns":
-        t1, t2 = st.tabs(["📅 Temporal Patterns", "📈 Impact Projection"])
+        t1, t2 = st.tabs(["Temporal Patterns", "Impact Projection"])
         with t1:
             from temporal_fire_pattern_page import render_temporal_fire_patterns
             render_temporal_fire_patterns()
@@ -1188,7 +1235,7 @@ def _render_page():
             render_impact_projection_page()
 
     elif page == "Technical":
-        t1, t2, t3 = st.tabs(["🔬 Data Governance", "🔗 IRWIN Linkage", "⏱️ Zone Duration"])
+        t1, t2, t3 = st.tabs(["Data Governance", "IRWIN Linkage", "Zone Duration"])
         with t1:
             from data_governance import render_data_governance
             render_data_governance()
@@ -1209,9 +1256,10 @@ def _render_page():
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Define onboarding gate early (also used in layout block below)
+# For Caregiver: onboarded="step1" means own profile done but evacuee not yet added
 _needs_onboarding = (
     role != "Data Analyst"
-    and st.session_state.get("onboarded") is None
+    and st.session_state.get("onboarded") is not True
 )
 
 # Check URL query param (floating button uses ?chat=open link)
@@ -1228,12 +1276,23 @@ if not st.session_state.chatbot_greeted and not _needs_onboarding:
     st.session_state.show_ai_panel = True
     # Inject welcome message into chat
     if not st.session_state.ai_messages:
-        _role_display = {
-            "Caregiver/Evacuee": "SAFE-PATH",
-            "Emergency Worker": "EVAC-OPS",
-            "Data Analyst": "DATA-LAB",
-        }.get(role, "SAFE-PATH")
         _welcome = {
+            "Evacuee": (
+                "Hi! I'm SAFE-PATH, your personal wildfire evacuation guide.\n\n"
+                "I can help you understand your evacuation zone, what to pack, "
+                "and what to do if you get an evacuation order.\n\n"
+                "**Try asking:** 'What does Zone A mean?' or "
+                "'What should I grab in an emergency?'\n\n"
+                "_Close this panel anytime — I'll be a button at the bottom._"
+            ),
+            "Caregiver": (
+                "Hi! I'm SAFE-PATH, here to help you keep your loved one safe.\n\n"
+                "I can help you monitor fire risk near their home, plan for their "
+                "specific needs (mobility, medical equipment), and send alerts.\n\n"
+                "**Try asking:** 'What if they can't evacuate on their own?' or "
+                "'How do I arrange transport for someone with a wheelchair?'\n\n"
+                "_Close this panel anytime — I'll be a button at the bottom._"
+            ),
             "Caregiver/Evacuee": (
                 "Hi! I'm SAFE-PATH, your wildfire evacuation assistant.\n\n"
                 "I can help you check if fires are near a loved one's home, "
@@ -1254,7 +1313,7 @@ if not st.session_state.chatbot_greeted and not _needs_onboarding:
                 "Ask about the Gi* analysis, SVI correlations, or signal gap statistics.\n\n"
                 "_Close this panel anytime — I'll be a button at the bottom._"
             ),
-        }.get(role, "Hello! How can I help?")
+        }.get(role, "Hi! I'm SAFE-PATH, here to help with wildfire evacuation guidance.")
         from datetime import datetime as _dt
         st.session_state.ai_messages = [{
             "role": "assistant",

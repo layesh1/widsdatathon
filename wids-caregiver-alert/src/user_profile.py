@@ -54,7 +54,7 @@ def get_risk_multiplier() -> float:
     return round(m, 3)
 
 
-def render_profile_setup(role: str = "Evacuee"):
+def render_profile_setup(role: str = "Evacuee", onboarded_value=True):
     """
     Full-page profile setup: address + demographics.
     Shows a Skip button for emergency use.
@@ -180,7 +180,7 @@ def render_profile_setup(role: str = "Evacuee"):
             "medical_equipment": medical_equipment,
             "language":       language,
         })
-        st.session_state.onboarded = True
+        st.session_state.onboarded = onboarded_value
         st.session_state.profile_skipped = False
         st.rerun()
 
