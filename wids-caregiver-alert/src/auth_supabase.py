@@ -90,6 +90,11 @@ def render_auth_page(logo_paths=None):
     if st.session_state.get("authenticated"):
         return
 
+    # ── Google OAuth callback — handle BEFORE showing the auth form ───────────
+    # Supabase redirects back with ?code=... after Google consent
+    if _handle_google_oauth_callback():
+        return  # rerun was called inside; st.stop() not needed
+
     _inject_auth_styles()
 
     # Center everything in a narrow middle column
@@ -119,9 +124,162 @@ def render_auth_page(logo_paths=None):
     st.stop()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GOOGLE OAUTH  (Supabase Auth provider)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_app_url() -> str:
+    """Return the app's base URL for OAuth redirect_to."""
+    try:
+        return st.secrets["APP_URL"]
+    except Exception:
+        return "http://localhost:8501"
+
+
+def _render_google_signin_button():
+    """
+    Shows a Google-styled OAuth button.
+    Silently skipped if Supabase is unreachable or not configured.
+    """
+    try:
+        sb       = get_supabase()
+        resp     = sb.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": _get_app_url(),
+                "scopes":      "email profile",
+            },
+        })
+        oauth_url = resp.url
+    except Exception:
+        return  # Supabase not configured or provider not enabled — skip silently
+
+    st.markdown(
+        f"""<a href="{oauth_url}" style="
+            display:flex;align-items:center;justify-content:center;gap:10px;
+            background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:8px;
+            padding:11px 16px;text-decoration:none;font-weight:500;font-size:0.9rem;
+            width:100%;box-sizing:border-box;margin-bottom:4px;
+            font-family:Roboto,sans-serif;
+        ">
+            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+              <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+              <path fill="#FBBC05" d="M4.5 10.48A4.8 4.8 0 0 1 4.5 7.5V5.43H1.83a8 8 0 0 0 0 7.14l2.67-2.09z"/>
+              <path fill="#EA4335" d="M8.98 3.58c1.32 0 2.5.46 3.44 1.35l2.54-2.54A8 8 0 0 0 1.83 5.43L4.5 7.5a4.77 4.77 0 0 1 4.48-3.92z"/>
+            </svg>
+            Continue with Google
+        </a>""",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div style='display:flex;align-items:center;gap:8px;margin:10px 0 12px'>"
+        "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
+        "<span style='font-size:0.75rem;opacity:0.45'>or use password</span>"
+        "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _handle_google_oauth_callback() -> bool:
+    """
+    Called at the top of render_auth_page.
+    Checks for ?code= query param returned by Supabase after Google consent.
+    Exchanges the code for a session, then creates/links the user in our users table.
+    Returns True if the callback was handled (session set, st.rerun() called).
+    """
+    code = st.query_params.get("code")
+    if not code:
+        return False
+
+    # Clear URL immediately so refreshing doesn't re-process the same code
+    st.query_params.clear()
+
+    sb = get_supabase()
+    try:
+        auth_resp    = sb.auth.exchange_code_for_session({"auth_code": code})
+        supabase_user = auth_resp.session.user if (auth_resp and auth_resp.session) else None
+    except Exception as e:
+        st.error(f"Google sign-in failed: {e}. Please try again.")
+        return False
+
+    if not supabase_user or not supabase_user.email:
+        st.error("Google sign-in did not return an email address. Please try again.")
+        return False
+
+    email     = supabase_user.email
+    meta      = supabase_user.user_metadata or {}
+    full_name = meta.get("full_name") or meta.get("name") or ""
+
+    user = _get_or_create_google_user(email, full_name)
+    if not user:
+        return False
+
+    _log_event(user["username"], "LOGIN", {"method": "google_oauth"})
+    st.session_state.update({
+        "authenticated": True,
+        "username":      user["username"],
+        "role":          user["role"],
+        "user_id":       user.get("id"),
+    })
+    st.rerun()
+    return True
+
+
+def _get_or_create_google_user(email: str, full_name: str) -> dict | None:
+    """
+    Find an existing account by email, or auto-create one for first-time
+    Google sign-in users. New accounts default to Caregiver/Evacuee role.
+    """
+    import secrets as _secrets
+
+    sb = get_supabase()
+    try:
+        # Existing account?
+        res = sb.table("users").select("*").ilike("email", email).execute()
+        if res.data:
+            return res.data[0]
+
+        # Derive a unique username from the email prefix
+        base = email.split("@")[0].replace(".", "_").replace("-", "_").lower()[:28]
+        username = base
+        n = 1
+        while sb.table("users").select("username").eq("username", username).execute().data:
+            username = f"{base}_{n}"
+            n += 1
+
+        # Generate a random unusable password (user signs in via Google only)
+        salt   = _generate_salt()
+        hashed = _hash_password(_secrets.token_hex(32), salt)
+
+        sb.table("users").insert({
+            "username":                      username,
+            "email":                         email,
+            "full_name":                     full_name,
+            "password_hash":                 hashed,
+            "password_salt":                 salt,
+            "role":                          "Caregiver/Evacuee",
+            "zip_code":                      "",
+            "phone":                         "",
+            "caregiver_verified":            False,
+            "caregiver_verification_method": "google_oauth",
+            "created_at":                    datetime.utcnow().isoformat(),
+        }).execute()
+
+        _log_event(username, "SIGNUP", {"role": "Caregiver/Evacuee", "method": "google_oauth"})
+        return {"username": username, "role": "Caregiver/Evacuee", "id": None}
+
+    except Exception as e:
+        st.error(f"Could not set up your account: {e}")
+        return None
+
+
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 def _render_login_form():
+    _render_google_signin_button()
+
     with st.form("login_form", clear_on_submit=False):
         identifier = st.text_input("Username or email")
         password   = st.text_input("Password", type="password")
