@@ -116,6 +116,7 @@ def render_auth_page(logo_paths=None):
         )
 
         # ── Google OAuth button ───────────────────────────────────────────────
+        st.write("DEBUG: google block reached")
         try:
             from urllib.parse import quote as _q
             _sb_url  = st.secrets["SUPABASE_URL"].rstrip("/")
