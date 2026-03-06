@@ -87,6 +87,7 @@ def render_auth_page(logo_paths=None):
     Sets session_state: authenticated, username, role, user_id.
     Calls st.stop() if not authenticated.
     """
+    st.write("AUTH_PAGE_V4")   # debug — remove after testing
     if st.session_state.get("authenticated"):
         return
 
