@@ -430,7 +430,7 @@ if st.session_state.get("show_home"):
 # SESSION STATE INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
 if "show_ai_panel" not in st.session_state:
-    st.session_state.show_ai_panel = True
+    st.session_state.show_ai_panel = False   # start closed; popup opens it
 if "ai_fullscreen" not in st.session_state:
     st.session_state.ai_fullscreen = False
 if "ai_messages" not in st.session_state:
@@ -439,6 +439,16 @@ if "ai_show_history" not in st.session_state:
     st.session_state.ai_show_history = False
 if "ai_session_start" not in st.session_state:
     st.session_state.ai_session_start = datetime.now().isoformat()
+# Chatbot popup: shown once per login session
+if "chatbot_greeted" not in st.session_state:
+    st.session_state.chatbot_greeted = False
+# Shared location opt-in
+if "location_prompt_shown" not in st.session_state:
+    st.session_state.location_prompt_shown = False
+if "user_gps_lat" not in st.session_state:
+    st.session_state.user_gps_lat = None
+if "user_gps_lon" not in st.session_state:
+    st.session_state.user_gps_lon = None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHAT HISTORY PERSISTENCE
@@ -1221,14 +1231,161 @@ def _render_page():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LAYOUT
+# CHATBOT POPUP + FLOATING BUTTON
 # ─────────────────────────────────────────────────────────────────────────────
-# ── Onboarding gate (non-analysts only, once per browser session) ─────────────
+
+# Define onboarding gate early (also used in layout block below)
 _needs_onboarding = (
     role != "Data Analyst"
     and st.session_state.get("onboarded") is None
 )
 
+# Check URL query param (floating button uses ?chat=open link)
+_qp = st.query_params
+if _qp.get("chat") == "open":
+    st.session_state.show_ai_panel = True
+    st.session_state.chatbot_greeted = True
+    st.query_params.clear()
+    st.rerun()
+
+# First-login chatbot popup: auto-open with a welcome message
+if not st.session_state.chatbot_greeted and not _needs_onboarding:
+    st.session_state.chatbot_greeted = True
+    st.session_state.show_ai_panel = True
+    # Inject welcome message into chat
+    if not st.session_state.ai_messages:
+        _role_display = {
+            "Caregiver/Evacuee": "SAFE-PATH",
+            "Emergency Worker": "EVAC-OPS",
+            "Data Analyst": "DATA-LAB",
+        }.get(role, "SAFE-PATH")
+        _welcome = {
+            "Caregiver/Evacuee": (
+                "Hi! I'm SAFE-PATH, your wildfire evacuation assistant.\n\n"
+                "I can help you check if fires are near a loved one's home, "
+                "find shelters, understand your evacuation zone, and plan next steps.\n\n"
+                "**Try asking:** 'Is there a fire near Ventura, CA?' or "
+                "'What should I do if I get an evacuation warning?'\n\n"
+                "_Close this panel anytime — I'll be a button at the bottom of the screen._"
+            ),
+            "Emergency Worker": (
+                "EVAC-OPS online. Ready for dispatch queries.\n\n"
+                "Ask about vulnerable population counts, SVI zones, "
+                "evacuation corridors, or resource allocation.\n\n"
+                "_Close this panel anytime — I'll be a button at the bottom._"
+            ),
+            "Data Analyst": (
+                "DATA-LAB ready. I can walk you through methodology, "
+                "statistical findings, and the WiDS 2021–2025 dataset.\n\n"
+                "Ask about the Gi* analysis, SVI correlations, or signal gap statistics.\n\n"
+                "_Close this panel anytime — I'll be a button at the bottom._"
+            ),
+        }.get(role, "Hello! How can I help?")
+        from datetime import datetime as _dt
+        st.session_state.ai_messages = [{
+            "role": "assistant",
+            "content": _welcome,
+            "ts": _dt.now().strftime("%H:%M"),
+        }]
+
+# Floating chat button (shown when AI panel is closed)
+# Uses a CSS fixed-position link → sets ?chat=open → Python picks it up above
+if not st.session_state.show_ai_panel:
+    st.markdown("""
+<style>
+.chat-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 99999;
+    background: #FF4B4B;
+    color: #fff !important;
+    border-radius: 50px;
+    padding: 13px 22px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    box-shadow: 0 4px 18px rgba(255,75,75,0.55);
+    letter-spacing: 0.01em;
+    transition: background 0.15s;
+}
+.chat-fab:hover { background: #e03a3a; color: #fff !important; }
+</style>
+<a class="chat-fab" href="?chat=open">💬 AI Assistant</a>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARE LOCATION PROMPT (one-time, non-analyst users)
+# ─────────────────────────────────────────────────────────────────────────────
+if (
+    not st.session_state.location_prompt_shown
+    and role != "Data Analyst"
+    and not _needs_onboarding
+):
+    st.session_state.location_prompt_shown = True
+    st.markdown("""
+<style>
+.loc-prompt {
+    background: #161b22; border: 1.5px solid #30363d; border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 16px; display: flex;
+    align-items: center; gap: 14px;
+}
+</style>
+<div class="loc-prompt">
+  <span style="font-size:1.6rem">📍</span>
+  <span style="color:#e6edf3">
+    <b>Share your location?</b><br>
+    <span style="font-size:0.82rem;color:#8b949e">
+      We can automatically detect nearby fires without you typing an address.
+      Your location is used only in this session and never stored.
+    </span>
+  </span>
+</div>
+""", unsafe_allow_html=True)
+
+    # JavaScript geolocation — posts coords back via query param
+    _loc_html = """
+<script>
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.latitude.toFixed(5);
+      var lon = pos.coords.longitude.toFixed(5);
+      var url = window.location.href.split('?')[0] + '?gps=' + lat + ',' + lon;
+      window.location.href = url;
+    },
+    function(err) { /* user denied */ }
+  );
+}
+</script>
+"""
+    col_yes, col_no, col_blank = st.columns([1, 1, 4])
+    with col_yes:
+        if st.button("📍 Share location", key="loc_share_yes", type="primary"):
+            st.components.v1.html(_loc_html, height=0)
+    with col_no:
+        if st.button("Skip", key="loc_share_no"):
+            pass  # just dismiss
+
+# Check if GPS coords came back via query param
+_gps_param = _qp.get("gps", "")
+if _gps_param and st.session_state.user_gps_lat is None:
+    try:
+        _glat, _glon = _gps_param.split(",")
+        st.session_state.user_gps_lat = float(_glat)
+        st.session_state.user_gps_lon = float(_glon)
+        # Also pre-fill the saved address inputs
+        st.session_state["user_lat"] = st.session_state.user_gps_lat
+        st.session_state["user_lon"] = st.session_state.user_gps_lon
+        st.query_params.clear()
+        st.success("Location detected — fire check will use your current position.")
+        st.rerun()
+    except Exception:
+        pass
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYOUT
+# ─────────────────────────────────────────────────────────────────────────────
 if _needs_onboarding:
     _render_onboarding()
 

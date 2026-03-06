@@ -536,19 +536,42 @@ def render_evacuation_planner_page(fire_data, vulnerable_populations):
 
     # ── Input ──
     st.subheader("Your Location")
-    st.info("500+ US cities, all 50 states.  Type your city — e.g. Charlotte, NC")
+
+    from address_utils import (
+        render_address_input, render_saved_locations_picker,
+        render_save_location_button, init_saved_locations,
+    )
+    init_saved_locations()
+
+    # Saved locations picker
+    saved_addr, saved_lat, saved_lon = render_saved_locations_picker(
+        label="Your saved locations",
+        key="evac_saved_pick",
+    )
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        address = st.text_input(
-            "Enter your city",
-            value=st.session_state.search_address or "",
-            placeholder="Charlotte, NC",
-            key="address_input",
+        typed_addr, auto_lat, auto_lon = render_address_input(
+            label="Enter your city or address",
+            key="evac_addr",
+            placeholder="Charlotte, NC  or  7404 Alamance Dr, Charlotte, NC",
+            help_text="Type 3+ characters for address suggestions",
         )
     with col2:
         st.markdown('<div style="height:28px"></div>', unsafe_allow_html=True)
         search_button = st.button("Find Shelters", type="primary", use_container_width=True)
+
+    # Resolve address from saved vs typed
+    if saved_addr:
+        address = saved_addr
+        _evac_lat, _evac_lon = saved_lat, saved_lon
+    else:
+        address = typed_addr or st.session_state.search_address or ""
+        _evac_lat, _evac_lon = auto_lat, auto_lon
+
+    # Save button for typed addresses
+    if typed_addr and not saved_addr:
+        render_save_location_button(typed_addr, auto_lat, auto_lon, key="evac_save")
 
     if search_button and address:
         st.session_state.search_triggered = True

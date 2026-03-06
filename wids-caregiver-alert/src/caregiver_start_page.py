@@ -640,12 +640,28 @@ def render_caregiver_start_page():
 
     # ── Address input ─────────────────────────────────────────────────────────
     st.subheader(_t("enter_location", lang))
+
+    from address_utils import (
+        render_address_input, render_saved_locations_picker,
+        render_save_location_button, render_saved_locations_manager,
+        init_saved_locations,
+    )
+    init_saved_locations()
+
+    # Saved locations picker (shown if user has any saved)
+    saved_addr, saved_lat, saved_lon = render_saved_locations_picker(
+        label="Your saved locations",
+        key="caregiver_saved_pick",
+    )
+
+    # Live autocomplete input
     col_addr, col_radius = st.columns([3, 1])
     with col_addr:
-        address_input = st.text_input(
-            _t("address_label", lang),
+        typed_addr, auto_lat, auto_lon = render_address_input(
+            label=_t("address_label", lang),
+            key="caregiver_addr",
             placeholder=_t("address_placeholder", lang),
-            help="Used only to check for nearby fires and find shelters. Not stored."
+            help_text="Used only to check for nearby fires. Not stored.",
         )
     with col_radius:
         search_radius = st.selectbox(
@@ -653,12 +669,23 @@ def render_caregiver_start_page():
             format_func=lambda x: _t("radius_fmt", lang, x=x)
         )
 
+    # Resolve: saved location takes priority over typed if user just picked one
+    if saved_addr:
+        address_input = saved_addr
+        _resolved_lat, _resolved_lon = saved_lat, saved_lon
+    else:
+        address_input = typed_addr
+        _resolved_lat, _resolved_lon = auto_lat, auto_lon
+
     check_btn = st.button(_t("check_btn", lang), type="primary",
                            disabled=(not address_input))
 
     if check_btn and address_input:
-        with st.spinner(_t("spinner_locate", lang)):
-            user_lat, user_lon, display_name = geocode_address(address_input)
+        if _resolved_lat is not None:
+            user_lat, user_lon, display_name = _resolved_lat, _resolved_lon, address_input
+        else:
+            with st.spinner(_t("spinner_locate", lang)):
+                user_lat, user_lon, display_name = geocode_address(address_input)
 
         if user_lat is None:
             st.error(_t("addr_error", lang))
@@ -684,6 +711,15 @@ def render_caregiver_start_page():
         else:
             st.session_state["nearby_fires"] = pd.DataFrame()
             st.session_state["firms_loaded"] = False
+
+    # ── Save location + manage saved ─────────────────────────────────────────
+    if address_input:
+        render_save_location_button(
+            address_input, _resolved_lat, _resolved_lon, key="caregiver_save"
+        )
+    if st.session_state.saved_locations:
+        with st.expander("Manage saved locations", expanded=False):
+            render_saved_locations_manager(key_prefix="caregiver_mgr")
 
     # ── Results ───────────────────────────────────────────────────────────────
     if "user_lat" in st.session_state:

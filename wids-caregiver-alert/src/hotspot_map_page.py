@@ -123,7 +123,15 @@ def render_hotspot_map_page():
     st.divider()
     st.subheader("Gi* Cluster Map — Where Caregiver Alerts Are Needed Most")
 
+    # Scattermapbox: fixed pixel dots that stay correctly sized at any zoom level
     tier_order = ["Hot Spot (90%+)", "Hot Spot (80%+)", "Not Significant", "Cold Spot (80%+)", "Cold Spot (90%+)"]
+    _DOT_SIZES = {
+        "Hot Spot (90%+)":  14,
+        "Hot Spot (80%+)":  10,
+        "Not Significant":   6,
+        "Cold Spot (80%+)":  8,
+        "Cold Spot (90%+)": 10,
+    }
     fig = go.Figure()
 
     for tier in tier_order:
@@ -131,19 +139,17 @@ def render_hotspot_map_page():
         if sub.empty:
             continue
         color = _CLUSTER_COLORS[tier]
-        abs_z = sub["gi_star"].abs().clip(upper=3)
-        dot_size = (abs_z * 4 + 6).clip(lower=5, upper=18)
+        opacity = 0.85 if "Spot" in tier else 0.25
 
-        fig.add_trace(go.Scattergeo(
+        fig.add_trace(go.Scattermapbox(
             lat=sub["lat"],
             lon=sub["lon"],
             mode="markers",
             name=tier,
             marker=dict(
-                size=dot_size,
+                size=_DOT_SIZES[tier],
                 color=color,
-                opacity=0.8 if "Hot Spot" in tier or "Cold Spot" in tier else 0.3,
-                line=dict(width=0.4, color="#111"),
+                opacity=opacity,
             ),
             text=sub["county_name"] + ", " + sub["state"].fillna(""),
             customdata=sub[["gi_star", "svi_score", "pct_silent", "total_fires"]].round(3).values,
@@ -159,33 +165,29 @@ def render_hotspot_map_page():
 
     fig.update_layout(
         template="plotly_dark",
-        geo=dict(
-            scope="usa",
-            showland=True,
-            showlakes=True,
-            showsubunits=True,
-            landcolor="#1a1a2e",
-            lakecolor="#0d1117",
-            subunitcolor="#333",
-            projection=dict(type="albers usa"),
+        mapbox=dict(
+            style="carto-darkmatter",
+            center=dict(lat=38.5, lon=-96.5),
+            zoom=3.2,
         ),
         legend=dict(
             title="Cluster Type",
             orientation="h",
-            y=-0.05,
+            bgcolor="rgba(13,17,23,0.85)",
+            font=dict(color="#e6edf3", size=11),
+            y=-0.08,
             x=0.5,
             xanchor="center",
         ),
-        height=520,
-        margin=dict(l=0, r=0, t=20, b=20),
-        title="Getis-Ord Gi* Spatial Clusters of Wildfire Alert Inequity",
+        height=540,
+        margin=dict(l=0, r=0, t=0, b=0),
     )
     st.plotly_chart(fig, use_container_width=True)
 
     st.caption(
         "Red = statistically significant hot spot (SVI × silent fire rate cluster). "
-        "Dot size = Gi* z-score magnitude. "
-        "Grey = not statistically significant. Blue = cold spot (well-served)."
+        "Dots are fixed pixel size — zoom in to see individual counties clearly. "
+        "Grey = not statistically significant. Blue = cold spot (well-served area)."
     )
 
     # ── Gi* score chart ───────────────────────────────────────────────────────
