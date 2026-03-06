@@ -139,7 +139,7 @@ def _get_app_url() -> str:
 def _render_google_signin_button():
     """
     Shows a Google-styled OAuth button.
-    Silently skipped if Supabase is unreachable or not configured.
+    Shows a debug warning if something is misconfigured.
     """
     try:
         sb       = get_supabase()
@@ -151,8 +151,9 @@ def _render_google_signin_button():
             },
         })
         oauth_url = resp.url
-    except Exception:
-        return  # Supabase not configured or provider not enabled — skip silently
+    except Exception as _google_err:
+        st.warning(f"Google sign-in unavailable: {_google_err}")
+        return
 
     st.markdown(
         f"""<a href="{oauth_url}" style="
