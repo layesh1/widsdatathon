@@ -599,7 +599,13 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    rc = {"Emergency Worker": "#AA0000", "Caregiver/Evacuee": "#3d7be8", "Data Analyst": "#7b5ea7"}.get(role, "#555")
+    rc = {
+        "Emergency Worker": "#AA0000",
+        "Evacuee":          "#3d7be8",
+        "Caregiver":        "#2ea44f",
+        "Caregiver/Evacuee":"#3d7be8",
+        "Data Analyst":     "#7b5ea7",
+    }.get(role, "#555")
     st.markdown(
         f"<div style='text-align:center;margin-bottom:0.4rem'>"
         f"<span class='role-badge' style='background:{rc}22;color:{rc};border:1px solid {rc}44'>{role}</span>"
@@ -622,40 +628,50 @@ with st.sidebar:
     # ── Navigation ────────────────────────────────────────────────────────────
     _NAV_CONFIG = {
         "Emergency Worker": [
-            ("Command",        "🚨", "Live incidents & evacuee tracker"),
-            ("Fire Forecast",  "🔥", "Fire spread prediction"),
-            ("At-Risk Zones",  "⚠️",  "Vulnerable population hotspots"),
-            ("Coverage Gaps",  "📡", "Where alerts may not reach"),
-            ("Resources",      "🏠", "Fire department directory"),
+            ("Command",        "Live incidents & evacuee tracker"),
+            ("Fire Forecast",  "Fire spread prediction"),
+            ("At-Risk Zones",  "Vulnerable population hotspots"),
+            ("Coverage Gaps",  "Where alerts may not reach"),
+            ("Resources",      "Fire department directory"),
         ],
-        "Caregiver/Evacuee": [
-            ("Am I Safe?",      "🗺️", "Active fires near your location"),
-            ("Evacuation Plan", "🏃", "Routes, shelters & checklists"),
-            ("Risk Calculator", "🧮", "Your personal risk profile"),
-            ("My County",       "📊", "Local fire stats for your area"),
-            ("Why This App?",   "💡", "Why official alerts aren't enough"),
+        "Evacuee": [
+            ("My Safety",      "Fire status near your location"),
+            ("My Plan",        "Your personalized evacuation plan"),
+            ("My Risk",        "Your vulnerability score with demographics"),
+            ("Why This App?",  "Why official alerts aren't enough"),
+        ],
+        "Caregiver": [
+            ("My Evacuee",     "Monitor your evacuee's fire status"),
+            ("Send Alert",     "Alert your evacuee to evacuate"),
+            ("Resources",      "Fire department & shelter directory"),
+            ("Why This App?",  "Why proactive alerts matter"),
+        ],
+        "Caregiver/Evacuee": [  # legacy fallback
+            ("My Safety",      "Fire status near your location"),
+            ("My Plan",        "Evacuation plan and shelters"),
+            ("My Risk",        "Your vulnerability score"),
+            ("Why This App?",  "Why official alerts aren't enough"),
         ],
         "Data Analyst": [
-            ("Overview",       "ℹ️",  "About this project"),
-            ("Signal Gap",     "📉", "Alert failure & silent fires"),
-            ("Equity & Risk",  "⚖️",  "Vulnerability analysis"),
-            ("Geographic",     "🗺️", "Hotspots, coverage & counties"),
-            ("Fire Patterns",  "📅", "Temporal & impact analysis"),
-            ("Technical",      "🔬", "Data quality & IRWIN linkage"),
-            ("Fire Predictor", "🔥", "ML fire spread forecast"),
+            ("Overview",       "About this project"),
+            ("Signal Gap",     "Alert failure & silent fires"),
+            ("Equity & Risk",  "Vulnerability analysis"),
+            ("Geographic",     "Hotspots, coverage & counties"),
+            ("Fire Patterns",  "Temporal & impact analysis"),
+            ("Technical",      "Data quality & IRWIN linkage"),
+            ("Fire Predictor", "Fire spread forecast"),
         ],
     }
 
     nav_items = _NAV_CONFIG.get(role, _NAV_CONFIG["Data Analyst"])
-    valid_pages = [label for label, _, _ in nav_items]
+    valid_pages = [label for label, _ in nav_items]
 
     if "current_page" not in st.session_state or st.session_state.current_page not in valid_pages:
         st.session_state.current_page = valid_pages[0]
 
-    for label, icon, desc in nav_items:
+    for label, desc in nav_items:
         active = st.session_state.current_page == label
-        display_label = f"{icon}  {label}"
-        if st.button(display_label, key=f"nav_{label}", use_container_width=True,
+        if st.button(label, key=f"nav_{label}", use_container_width=True,
                      type="primary" if active else "secondary",
                      help=desc):
             st.session_state.current_page = label
@@ -1004,63 +1020,11 @@ def _render_ai_panel(role: str, *, is_fullscreen: bool = False, show_border: boo
 # ─────────────────────────────────────────────────────────────────────────────
 def _render_onboarding():
     from ui_utils import page_header, render_card, section_header
+    from user_profile import render_profile_setup, render_evacuee_setup, get_caregiver_evacuee
 
-    if role == "Caregiver/Evacuee":
-        page_header("Welcome — let's set up your alert profile")
-        st.markdown(
-            "Answer three quick questions to see your personal wildfire risk. "
-            "This takes under a minute and nothing is shared."
-        )
-
-        step = st.session_state.get("onboard_step", 1)
-
-        if step == 1:
-            section_header("Step 1 of 3 — Your location")
-            county_input = st.text_input(
-                "Your county and state",
-                placeholder="e.g. Los Angeles, CA",
-                key="onboard_county",
-            )
-            if st.button("Next", type="primary", disabled=not county_input):
-                st.session_state.selected_county = county_input
-                st.session_state.onboard_step = 2
-                st.rerun()
-
-        elif step == 2:
-            section_header("Step 2 of 3 — Your household")
-            st.selectbox(
-                "Mobility level of your household",
-                ["Fully mobile", "Elderly / slow mobility", "Disabled, needs assistance",
-                 "No personal vehicle", "Medical equipment (O2, dialysis, etc.)"],
-                key="onboard_mobility",
-            )
-            st.number_input("Dependents needing help (children, elderly, disabled)", 0, 10, 0,
-                            key="onboard_dependents")
-            if st.button("Next", type="primary"):
-                st.session_state.onboard_step = 3
-                st.rerun()
-
-        elif step >= 3:
-            section_header("Step 3 of 3 — Know the risk")
-            h1, h2, h3 = st.columns(3)
-            with h1:
-                render_card("3 in 4 fires", "No public alert",
-                            "73% of wildfires happen with no official warning", "#FF4B4B")
-            with h2:
-                render_card("Median time to order", "1.1 hours",
-                            "From ignition to official evacuation order — if one comes at all", "#d4a017")
-            with h3:
-                render_card("Vulnerable county fires", "+17% faster spread",
-                            "High-SVI counties face faster-moving fires and fewer resources", "#d4a017")
-            st.markdown("")
-            st.markdown(
-                "This app monitors fire signals and helps you build a personalized evacuation plan. "
-                "Your county and household profile are used only within this session."
-            )
-            if st.button("Enter the app", type="primary", use_container_width=True):
-                st.session_state.onboarded = True
-                st.session_state.onboard_step = 1
-                st.rerun()
+    if role in ("Evacuee", "Caregiver", "Caregiver/Evacuee"):
+        render_profile_setup(role=role)
+        return
 
     elif role == "Emergency Worker":
         page_header("Welcome — set your operational area")
@@ -1131,7 +1095,21 @@ def _render_page():
         from dispatcher_resources_page import render_dispatcher_resources_page
         render_dispatcher_resources_page()
 
-    # ── Caregiver/Evacuee ─────────────────────────────────────────────────────
+    # ── Evacuee (unified single-address flow) ─────────────────────────────────
+    elif page in ("My Safety", "My Plan", "My Risk"):
+        from evacuee_dashboard import render_evacuee_dashboard
+        render_evacuee_dashboard(fire_data=fire_data)
+
+    # ── Caregiver ─────────────────────────────────────────────────────────────
+    elif page == "My Evacuee":
+        from caregiver_dashboard import render_caregiver_dashboard
+        render_caregiver_dashboard(fire_data=fire_data)
+
+    elif page == "Send Alert":
+        from caregiver_dashboard import render_caregiver_dashboard
+        render_caregiver_dashboard(fire_data=fire_data)
+
+    # ── Legacy Caregiver/Evacuee pages (kept for backward compat) ────────────
     elif page == "Am I Safe?":
         from caregiver_start_page import render_caregiver_start_page
         render_caregiver_start_page()
@@ -1141,10 +1119,6 @@ def _render_page():
             from evacuation_planner_page import render_evacuation_planner_page
             sig    = inspect.signature(render_evacuation_planner_page)
             params = list(sig.parameters.keys())
-            saved_plan = get_evacuation_plan(username)
-            if saved_plan and "evacuation_plan_loaded" not in st.session_state:
-                st.session_state.evacuation_plan_loaded = True
-                st.info("Your saved evacuation plan has been restored.")
             if "vulnerable_populations" in params and "fire_data" in params:
                 render_evacuation_planner_page(fire_data=fire_data, vulnerable_populations=None)
             elif "fire_data" in params:

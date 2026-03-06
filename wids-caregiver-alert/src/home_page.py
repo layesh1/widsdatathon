@@ -130,40 +130,56 @@ def render_home_page():
         unsafe_allow_html=True,
     )
 
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        if st.button(
-            "🏃 Enter as Caregiver / Evacuee",
-            key="home_role_caregiver",
-            use_container_width=True,
-            type="primary",
-        ):
-            st.session_state.role = "Caregiver/Evacuee"
+    # 2×2 role grid
+    col_a, col_b = st.columns(2)
+    _gap = "<div style='height:8px'></div>"
+
+    with col_a:
+        st.markdown(
+            "<div style='background:#161b22;border:1px solid #30363d;border-radius:10px;"
+            "padding:14px 16px;margin-bottom:8px'>"
+            "<div style='font-weight:700;font-size:1rem;color:#e6edf3;margin-bottom:4px'>I need to evacuate</div>"
+            "<div style='font-size:0.78rem;color:#8b949e'>See fire status, risk level, and my evacuation plan</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Enter as Evacuee", key="home_role_evacuee",
+                     use_container_width=True, type="primary"):
+            st.session_state.role = "Evacuee"
             st.session_state.show_home = False
-            st.session_state.onboarded = True
-            st.session_state.current_page = "Am I Safe?"
+            st.session_state.onboarded = None   # trigger profile setup
+            st.session_state.current_page = "My Safety"
             st.rerun()
 
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    with col_b:
+        st.markdown(
+            "<div style='background:#161b22;border:1px solid #30363d;border-radius:10px;"
+            "padding:14px 16px;margin-bottom:8px'>"
+            "<div style='font-weight:700;font-size:1rem;color:#e6edf3;margin-bottom:4px'>I care for someone else</div>"
+            "<div style='font-size:0.78rem;color:#8b949e'>Monitor their area, send evacuation alerts</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Enter as Caregiver", key="home_role_caregiver",
+                     use_container_width=True, type="primary"):
+            st.session_state.role = "Caregiver"
+            st.session_state.show_home = False
+            st.session_state.onboarded = None
+            st.session_state.current_page = "My Evacuee"
+            st.rerun()
 
-        if st.button(
-            "🚨 Enter as Emergency Responder",
-            key="home_role_responder",
-            use_container_width=True,
-        ):
+    col_c, col_d = st.columns(2)
+    with col_c:
+        if st.button("Emergency Responder", key="home_role_responder",
+                     use_container_width=True):
             st.session_state.role = "Emergency Worker"
             st.session_state.show_home = False
             st.session_state.onboarded = True
             st.session_state.current_page = "Command"
             st.rerun()
-
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
-        if st.button(
-            "📊 Enter as Data Analyst",
-            key="home_role_analyst",
-            use_container_width=True,
-        ):
+    with col_d:
+        if st.button("Data Analyst", key="home_role_analyst",
+                     use_container_width=True):
             st.session_state.role = "Data Analyst"
             st.session_state.show_home = False
             st.session_state.onboarded = True
