@@ -176,37 +176,33 @@ def _render_google_signin_button():
 </script>
 """, height=0)
 
-    # Render the Google button + divider as a self-contained HTML component
-    # (iframe context — immune to Streamlit CSS sanitization)
-    st.components.v1.html(f"""
-<style>
-  body {{ margin:0; padding:0; background:transparent; }}
-  .g-btn {{
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    background:#fff; color:#3c4043; border:1px solid #dadce0; border-radius:8px;
-    padding:10px 16px; text-decoration:none; font-weight:500; font-size:0.9rem;
-    width:100%; box-sizing:border-box; cursor:pointer;
-    font-family:Roboto,Arial,sans-serif; transition:box-shadow .15s;
-  }}
-  .g-btn:hover {{ box-shadow:0 1px 3px rgba(0,0,0,.2); }}
-  .divider {{
-    display:flex; align-items:center; gap:8px;
-    margin:12px 0 4px; color:rgba(200,200,200,0.6); font-size:0.75rem;
-    font-family:sans-serif;
-  }}
-  .divider hr {{ flex:1; border:none; border-top:1px solid rgba(128,128,128,0.25); margin:0; }}
-</style>
-<a class="g-btn" href="{oauth_url}" target="_top">
-  <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-    <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-    <path fill="#FBBC05" d="M4.5 10.48A4.8 4.8 0 0 1 4.5 7.5V5.43H1.83a8 8 0 0 0 0 7.14l2.67-2.09z"/>
-    <path fill="#EA4335" d="M8.98 3.58c1.32 0 2.5.46 3.44 1.35l2.54-2.54A8 8 0 0 0 1.83 5.43L4.5 7.5a4.77 4.77 0 0 1 4.48-3.92z"/>
-  </svg>
-  Continue with Google
-</a>
-<div class="divider"><hr>or sign in with password<hr></div>
-""", height=72)
+    # Google button as a styled <a> tag — works inside tab context with unsafe_allow_html
+    st.markdown(
+        f"""<a href="{oauth_url}" style="
+            display:flex;align-items:center;justify-content:center;gap:10px;
+            background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:8px;
+            padding:10px 16px;text-decoration:none;font-weight:500;font-size:0.9rem;
+            width:100%;box-sizing:border-box;cursor:pointer;margin-bottom:2px;
+            font-family:Roboto,Arial,sans-serif;
+        ">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+            <path fill="#FBBC05" d="M4.5 10.48A4.8 4.8 0 0 1 4.5 7.5V5.43H1.83a8 8 0 0 0 0 7.14l2.67-2.09z"/>
+            <path fill="#EA4335" d="M8.98 3.58c1.32 0 2.5.46 3.44 1.35l2.54-2.54A8 8 0 0 0 1.83 5.43L4.5 7.5a4.77 4.77 0 0 1 4.48-3.92z"/>
+          </svg>
+          Continue with Google
+        </a>""",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div style='display:flex;align-items:center;gap:8px;margin:10px 0 8px'>"
+        "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
+        "<span style='font-size:0.75rem;opacity:0.45'>or sign in with password</span>"
+        "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _handle_google_oauth_callback() -> bool:
