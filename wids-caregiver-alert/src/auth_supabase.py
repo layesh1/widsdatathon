@@ -115,30 +115,26 @@ def render_auth_page(logo_paths=None):
             unsafe_allow_html=True,
         )
 
-        # ── Google OAuth button — inline, no helper function ─────────────────
+        # ── Google OAuth button ───────────────────────────────────────────────
         try:
             from urllib.parse import quote as _q
             _sb_url  = st.secrets["SUPABASE_URL"].rstrip("/")
-            _app_url = str(st.secrets.get("APP_URL", "https://marchfourt.streamlit.app")).rstrip("/")
-            _g_url   = f"{_sb_url}/auth/v1/authorize?provider=google&redirect_to={_q(_app_url, safe='')}"
-            st.markdown(
-                f"""<a href="{_g_url}" target="_self" style="
-                    display:flex;align-items:center;justify-content:center;gap:10px;
-                    background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:8px;
-                    padding:11px 16px;text-decoration:none;font-weight:500;font-size:0.9rem;
-                    width:100%;box-sizing:border-box;margin-bottom:8px;font-family:Roboto,sans-serif;
-                ">
-                <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-                  <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-                  <path fill="#FBBC05" d="M4.5 10.48A4.8 4.8 0 0 1 4.5 7.5V5.43H1.83a8 8 0 0 0 0 7.14l2.67-2.09z"/>
-                  <path fill="#EA4335" d="M8.98 3.58c1.32 0 2.5.46 3.44 1.35l2.54-2.54A8 8 0 0 0 1.83 5.43L4.5 7.5a4.77 4.77 0 0 1 4.48-3.92z"/>
-                </svg>
-                Continue with Google</a>""",
-                unsafe_allow_html=True,
+            try:
+                _app_url = st.secrets["APP_URL"].rstrip("/")
+            except Exception:
+                _app_url = "https://marchfourt.streamlit.app"
+            _g_url = (
+                f"{_sb_url}/auth/v1/authorize"
+                f"?provider=google"
+                f"&redirect_to={_q(_app_url, safe='')}"
+            )
+            st.link_button(
+                "Continue with Google",
+                url=_g_url,
+                use_container_width=True,
             )
             st.markdown(
-                "<div style='display:flex;align-items:center;gap:8px;margin:0 0 12px'>"
+                "<div style='display:flex;align-items:center;gap:8px;margin:4px 0 14px'>"
                 "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
                 "<span style='font-size:0.75rem;opacity:0.45'>or use password</span>"
                 "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
