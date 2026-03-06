@@ -140,13 +140,13 @@ def _render_google_signin_button():
     """
     Shows a Google-styled OAuth button.
     Builds the Supabase OAuth URL directly — no supabase-py OAuth methods needed.
-    Silently hidden if SUPABASE_URL is not in secrets.
     """
-    try:
-        supabase_url = st.secrets["SUPABASE_URL"].rstrip("/")
-        app_url      = _get_app_url()
-    except Exception:
-        return  # secrets not configured — skip
+    supabase_url = st.secrets.get("SUPABASE_URL", "").rstrip("/")
+    if not supabase_url:
+        st.info("Google sign-in: SUPABASE_URL not found in secrets. "
+                f"Available keys: {list(st.secrets.keys())}")
+        return
+    app_url = _get_app_url()
 
     from urllib.parse import quote
     oauth_url = (
