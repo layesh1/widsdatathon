@@ -155,21 +155,29 @@ def _render_google_signin_button():
         f"&redirect_to={quote(app_url, safe='')}"
     )
 
-    # JS: if Supabase returns the token as a hash fragment (#access_token=...),
-    # rewrite it to ?g_at=... so Python can read it via st.query_params.
+    # JS: Supabase returns tokens in the hash fragment of the PARENT page
+    # (#access_token=...).  This component runs in an iframe so we must read
+    # window.parent.location.hash, then rewrite it to ?g_at=... on the top
+    # window so Python can pick it up via st.query_params on the next load.
     st.components.v1.html("""
 <script>
 (function() {
-    if (window.location.hash && window.location.hash.indexOf('access_token') !== -1) {
-        var hash = window.location.hash.substring(1);
-        var params = new URLSearchParams(hash);
+    var h = '';
+    try { h = window.parent.location.hash; } catch(e) {}
+    if (!h) try { h = window.top.location.hash; } catch(e) {}
+    if (h && h.indexOf('access_token') !== -1) {
+        var params = new URLSearchParams(h.substring(1));
         var at = params.get('access_token');
         var rt = params.get('refresh_token') || '';
         if (at) {
-            var newUrl = window.location.origin + window.location.pathname
+            var base = '';
+            try { base = window.top.location.origin + window.top.location.pathname; }
+            catch(e) { base = window.parent.location.origin + window.parent.location.pathname; }
+            var newUrl = base
                 + '?g_at=' + encodeURIComponent(at)
                 + (rt ? '&g_rt=' + encodeURIComponent(rt) : '');
-            window.top.location.replace(newUrl);
+            try { window.top.location.replace(newUrl); }
+            catch(e) { window.parent.location.replace(newUrl); }
         }
     }
 })();
