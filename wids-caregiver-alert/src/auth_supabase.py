@@ -87,12 +87,10 @@ def render_auth_page(logo_paths=None):
     Sets session_state: authenticated, username, role, user_id.
     Calls st.stop() if not authenticated.
     """
-    st.write("AUTH_PAGE_V4")   # debug — remove after testing
     if st.session_state.get("authenticated"):
         return
 
     # ── Google OAuth callback — handle BEFORE showing the auth form ───────────
-    # Supabase redirects back with ?code=... after Google consent
     if _handle_google_oauth_callback():
         return  # rerun was called inside; st.stop() not needed
 
@@ -115,36 +113,6 @@ def render_auth_page(logo_paths=None):
             "<div class='auth-subtitle'>WiDS Datathon 2025 — Wildfire Caregiver Alert System</div>",
             unsafe_allow_html=True,
         )
-
-        # ── Google OAuth button ───────────────────────────────────────────────
-        st.write("DEBUG: google block reached")
-        try:
-            from urllib.parse import quote as _q
-            _sb_url  = st.secrets["SUPABASE_URL"].rstrip("/")
-            try:
-                _app_url = st.secrets["APP_URL"].rstrip("/")
-            except Exception:
-                _app_url = "https://marchfourt.streamlit.app"
-            _g_url = (
-                f"{_sb_url}/auth/v1/authorize"
-                f"?provider=google"
-                f"&redirect_to={_q(_app_url, safe='')}"
-            )
-            st.link_button(
-                "Continue with Google",
-                url=_g_url,
-                use_container_width=True,
-            )
-            st.markdown(
-                "<div style='display:flex;align-items:center;gap:8px;margin:4px 0 14px'>"
-                "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
-                "<span style='font-size:0.75rem;opacity:0.45'>or use password</span>"
-                "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-        except Exception as _ge:
-            st.caption(f"[Google sign-in unavailable: {_ge}]")
 
         tab_in, tab_up = st.tabs(["Sign In", "Create Account"])
         with tab_in:
@@ -169,14 +137,15 @@ def _get_app_url() -> str:
 
 def _render_google_signin_button():
     """
-    Shows a Google-styled OAuth button.
-    Builds the Supabase OAuth URL directly — no supabase-py OAuth methods needed.
+    Shows a Google OAuth button using st.link_button (native Streamlit — cannot be sanitized).
+    Builds the Supabase OAuth URL directly.
+    Also injects JS to handle the hash-fragment callback from Supabase implicit flow.
     """
-    supabase_url = st.secrets.get("SUPABASE_URL", "").rstrip("/")
-    if not supabase_url:
-        st.info("Google sign-in: SUPABASE_URL not found in secrets. "
-                f"Available keys: {list(st.secrets.keys())}")
-        return
+    try:
+        supabase_url = st.secrets["SUPABASE_URL"].rstrip("/")
+    except Exception:
+        return  # secrets not configured — silently skip
+
     app_url = _get_app_url()
 
     from urllib.parse import quote
@@ -186,8 +155,8 @@ def _render_google_signin_button():
         f"&redirect_to={quote(app_url, safe='')}"
     )
 
-    # Inject JS once: reads hash fragment (#access_token=...) on return from Google
-    # and rewrites it to query params (?access_token=...) that Python can read.
+    # JS: if Supabase returns the token as a hash fragment (#access_token=...),
+    # rewrite it to ?g_at=... so Python can read it via st.query_params.
     st.components.v1.html("""
 <script>
 (function() {
@@ -200,35 +169,23 @@ def _render_google_signin_button():
             var newUrl = window.location.origin + window.location.pathname
                 + '?g_at=' + encodeURIComponent(at)
                 + (rt ? '&g_rt=' + encodeURIComponent(rt) : '');
-            window.location.replace(newUrl);
+            window.parent.location.replace(newUrl);
         }
     }
 })();
 </script>
 """, height=0)
 
-    st.markdown(
-        f"""<a href="{oauth_url}" style="
-            display:flex;align-items:center;justify-content:center;gap:10px;
-            background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:8px;
-            padding:11px 16px;text-decoration:none;font-weight:500;font-size:0.9rem;
-            width:100%;box-sizing:border-box;margin-bottom:4px;
-            font-family:Roboto,sans-serif;
-        ">
-            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-              <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-              <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-              <path fill="#FBBC05" d="M4.5 10.48A4.8 4.8 0 0 1 4.5 7.5V5.43H1.83a8 8 0 0 0 0 7.14l2.67-2.09z"/>
-              <path fill="#EA4335" d="M8.98 3.58c1.32 0 2.5.46 3.44 1.35l2.54-2.54A8 8 0 0 0 1.83 5.43L4.5 7.5a4.77 4.77 0 0 1 4.48-3.92z"/>
-            </svg>
-            Continue with Google
-        </a>""",
-        unsafe_allow_html=True,
+    # st.link_button is a native Streamlit element — always renders regardless of CSS
+    st.link_button(
+        "🔵  Continue with Google",
+        url=oauth_url,
+        use_container_width=True,
     )
     st.markdown(
-        "<div style='display:flex;align-items:center;gap:8px;margin:10px 0 12px'>"
+        "<div style='display:flex;align-items:center;gap:8px;margin:10px 0 8px'>"
         "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
-        "<span style='font-size:0.75rem;opacity:0.45'>or use password</span>"
+        "<span style='font-size:0.75rem;opacity:0.45'>or sign in with password</span>"
         "<div style='flex:1;height:1px;background:rgba(128,128,128,0.2)'></div>"
         "</div>",
         unsafe_allow_html=True,
@@ -340,6 +297,9 @@ def _get_or_create_google_user(email: str, full_name: str) -> dict | None:
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 def _render_login_form():
+    # ── Google OAuth button (placed here because it definitely renders) ────────
+    _render_google_signin_button()
+
     with st.form("login_form", clear_on_submit=False):
         identifier = st.text_input("Username or email")
         password   = st.text_input("Password", type="password")
