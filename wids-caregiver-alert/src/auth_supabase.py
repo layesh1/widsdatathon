@@ -131,7 +131,7 @@ def render_auth_page(logo_paths=None):
 def _get_app_url() -> str:
     """Return the app's base URL for OAuth redirect_to."""
     try:
-        return st.secrets["APP_URL"]
+        return st.secrets["APP_URL"].rstrip("/")
     except Exception:
         return "http://localhost:8501"
 
@@ -139,21 +139,42 @@ def _get_app_url() -> str:
 def _render_google_signin_button():
     """
     Shows a Google-styled OAuth button.
-    Shows a debug warning if something is misconfigured.
+    Builds the Supabase OAuth URL directly — no supabase-py OAuth methods needed.
+    Silently hidden if SUPABASE_URL is not in secrets.
     """
     try:
-        sb       = get_supabase()
-        resp     = sb.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": _get_app_url(),
-                "scopes":      "email profile",
-            },
-        })
-        oauth_url = resp.url
-    except Exception as _google_err:
-        st.warning(f"Google sign-in unavailable: {_google_err}")
-        return
+        supabase_url = st.secrets["SUPABASE_URL"].rstrip("/")
+        app_url      = _get_app_url()
+    except Exception:
+        return  # secrets not configured — skip
+
+    from urllib.parse import quote
+    oauth_url = (
+        f"{supabase_url}/auth/v1/authorize"
+        f"?provider=google"
+        f"&redirect_to={quote(app_url, safe='')}"
+    )
+
+    # Inject JS once: reads hash fragment (#access_token=...) on return from Google
+    # and rewrites it to query params (?access_token=...) that Python can read.
+    st.components.v1.html("""
+<script>
+(function() {
+    if (window.location.hash && window.location.hash.indexOf('access_token') !== -1) {
+        var hash = window.location.hash.substring(1);
+        var params = new URLSearchParams(hash);
+        var at = params.get('access_token');
+        var rt = params.get('refresh_token') || '';
+        if (at) {
+            var newUrl = window.location.origin + window.location.pathname
+                + '?g_at=' + encodeURIComponent(at)
+                + (rt ? '&g_rt=' + encodeURIComponent(rt) : '');
+            window.location.replace(newUrl);
+        }
+    }
+})();
+</script>
+""", height=0)
 
     st.markdown(
         f"""<a href="{oauth_url}" style="
@@ -186,32 +207,44 @@ def _render_google_signin_button():
 def _handle_google_oauth_callback() -> bool:
     """
     Called at the top of render_auth_page.
-    Checks for ?code= query param returned by Supabase after Google consent.
-    Exchanges the code for a session, then creates/links the user in our users table.
-    Returns True if the callback was handled (session set, st.rerun() called).
+    Checks for ?g_at= (access token rewritten from hash by our JS snippet).
+    Uses the token to fetch the user from Supabase, then creates/links their
+    account in our users table.
+    Returns True if the callback was handled (st.rerun() was called).
     """
-    code = st.query_params.get("code")
-    if not code:
+    import requests as _req
+
+    access_token = st.query_params.get("g_at")
+    if not access_token:
         return False
 
-    # Clear URL immediately so refreshing doesn't re-process the same code
     st.query_params.clear()
 
-    sb = get_supabase()
+    # Fetch user info directly via Supabase REST — works with any supabase-py version
     try:
-        auth_resp    = sb.auth.exchange_code_for_session({"auth_code": code})
-        supabase_user = auth_resp.session.user if (auth_resp and auth_resp.session) else None
+        supabase_url = st.secrets["SUPABASE_URL"].rstrip("/")
+        anon_key     = st.secrets["SUPABASE_ANON_KEY"]
+        resp = _req.get(
+            f"{supabase_url}/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "apikey":        anon_key,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        user_data = resp.json()
     except Exception as e:
-        st.error(f"Google sign-in failed: {e}. Please try again.")
+        st.error(f"Google sign-in failed — could not verify token: {e}")
         return False
 
-    if not supabase_user or not supabase_user.email:
+    email     = user_data.get("email", "")
+    meta      = user_data.get("user_metadata") or {}
+    full_name = meta.get("full_name") or meta.get("name") or ""
+
+    if not email:
         st.error("Google sign-in did not return an email address. Please try again.")
         return False
-
-    email     = supabase_user.email
-    meta      = supabase_user.user_metadata or {}
-    full_name = meta.get("full_name") or meta.get("name") or ""
 
     user = _get_or_create_google_user(email, full_name)
     if not user:
@@ -237,12 +270,10 @@ def _get_or_create_google_user(email: str, full_name: str) -> dict | None:
 
     sb = get_supabase()
     try:
-        # Existing account?
         res = sb.table("users").select("*").ilike("email", email).execute()
         if res.data:
             return res.data[0]
 
-        # Derive a unique username from the email prefix
         base = email.split("@")[0].replace(".", "_").replace("-", "_").lower()[:28]
         username = base
         n = 1
@@ -250,7 +281,6 @@ def _get_or_create_google_user(email: str, full_name: str) -> dict | None:
             username = f"{base}_{n}"
             n += 1
 
-        # Generate a random unusable password (user signs in via Google only)
         salt   = _generate_salt()
         hashed = _hash_password(_secrets.token_hex(32), salt)
 
