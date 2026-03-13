@@ -141,7 +141,7 @@ def render_hotspot_map_page():
         color = _CLUSTER_COLORS[tier]
         opacity = 0.85 if "Spot" in tier else 0.25
 
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattergeo(
             lat=sub["lat"],
             lon=sub["lon"],
             mode="markers",
@@ -165,10 +165,16 @@ def render_hotspot_map_page():
 
     fig.update_layout(
         template="plotly_dark",
-        mapbox=dict(
-            style="carto-darkmatter",
-            center=dict(lat=38.5, lon=-96.5),
-            zoom=3.2,
+        geo=dict(
+            scope="usa",
+            showland=True,
+            landcolor="#1a1a2e",
+            showlakes=True,
+            lakecolor="#0d1117",
+            showsubunits=True,
+            subunitcolor="#333",
+            showcountries=False,
+            projection=dict(type="albers usa"),
         ),
         legend=dict(
             title="Cluster Type",

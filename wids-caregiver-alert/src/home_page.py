@@ -149,6 +149,9 @@ def render_home_page():
             st.session_state.show_home = False
             st.session_state.onboarded = None   # trigger profile setup
             st.session_state.current_page = "My Safety"
+            st.session_state.show_ai_panel = False
+            st.session_state.ai_messages = []
+            st.session_state.chatbot_greeted = False
             st.rerun()
 
     with col_b:
@@ -166,6 +169,9 @@ def render_home_page():
             st.session_state.show_home = False
             st.session_state.onboarded = None
             st.session_state.current_page = "My Evacuee"
+            st.session_state.show_ai_panel = False
+            st.session_state.ai_messages = []
+            st.session_state.chatbot_greeted = False
             st.rerun()
 
     col_c, col_d = st.columns(2)
@@ -176,6 +182,9 @@ def render_home_page():
             st.session_state.show_home = False
             st.session_state.onboarded = True
             st.session_state.current_page = "Command"
+            st.session_state.show_ai_panel = False
+            st.session_state.ai_messages = []
+            st.session_state.chatbot_greeted = False
             st.rerun()
     with col_d:
         if st.button("Data Analyst", key="home_role_analyst",
@@ -184,6 +193,9 @@ def render_home_page():
             st.session_state.show_home = False
             st.session_state.onboarded = True
             st.session_state.current_page = "Overview"
+            st.session_state.show_ai_panel = False
+            st.session_state.ai_messages = []
+            st.session_state.chatbot_greeted = False
             st.rerun()
 
     st.markdown(

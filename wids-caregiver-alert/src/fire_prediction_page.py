@@ -20,6 +20,7 @@ import plotly.graph_objects as go
 import requests
 from math import radians, cos, sin, sqrt, exp, tan, pi, log
 from datetime import datetime
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +615,40 @@ def compute_ellipse_area_acres(R_head_m_min, LW, t_min):
 _TIME_HORIZONS = [1, 3, 6, 12, 24]
 _ELLIPSE_COLORS = ["#FFF176", "#FFB300", "#FF6F00", "#FF3D00", "#AA0000"]
 
+_COUNTY_SVI_PATHS = [
+    Path("01_raw_data/processed/county_fire_stats.csv"),
+    Path("../01_raw_data/processed/county_fire_stats.csv"),
+    Path(__file__).parent / "../../01_raw_data/processed/county_fire_stats.csv",
+]
+
+
+@st.cache_data(show_spinner=False)
+def _load_county_svi_table():
+    for p in _COUNTY_SVI_PATHS:
+        if p.exists():
+            try:
+                df = pd.read_csv(
+                    p, usecols=["county_name", "state", "svi_score", "lat", "lon"]
+                )
+                df["svi_score"] = pd.to_numeric(df["svi_score"], errors="coerce")
+                df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+                df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+                return df.dropna(subset=["svi_score", "lat", "lon"])
+            except Exception:
+                pass
+    return None
+
+
+def _lookup_county_svi(lat, lon):
+    """Return (svi_score, county_name, state) for the nearest county to lat/lon."""
+    df = _load_county_svi_table()
+    if df is None or df.empty:
+        return 0.5, None, None
+    df2 = df.copy()
+    df2["_dist"] = ((df2["lat"] - lat) ** 2 + (df2["lon"] - lon) ** 2) ** 0.5
+    row = df2.loc[df2["_dist"].idxmin()]
+    return float(row["svi_score"]), str(row["county_name"]), str(row["state"])
+
 
 # ===========================================================================
 # Tab 1: Spot Fire Spread
@@ -644,6 +679,9 @@ def _render_spot_fire_spread():
 
     if location_q:
         lat, lon = _resolve_location(location_q, "spot_lat", "spot_lon", lat, lon)
+
+    # SVI auto-lookup (nearest county in WiDS dataset)
+    svi_auto, svi_county, svi_state = _lookup_county_svi(lat, lon)
 
     # --- Live weather ---
     weather = _fetch_weather(lat, lon)
@@ -694,6 +732,19 @@ def _render_spot_fire_spread():
             "Previous-day FFMC (0–101)",
             0.0, 101.0, 85.0, step=1.0, key="spot_ffmc",
             help="85 = average summer dryness. Lower = wetter. Higher = extreme dryness.",
+        )
+        _svi_label = (
+            f"County SVI — {svi_county}, {svi_state}"
+            if svi_county else "County SVI (0–1)"
+        )
+        svi_input = st.number_input(
+            _svi_label,
+            0.0, 1.0, float(svi_auto), step=0.01, key="spot_svi",
+            help=(
+                "Social Vulnerability Index (CDC). 0 = low vulnerability, 1 = high. "
+                "Auto-detected from nearest county in WiDS dataset. "
+                "WiDS data shows high-SVI counties face evacuation orders 11.5 h later."
+            ),
         )
 
     if not st.button("Compute Fire Spread", type="primary", key="spot_run"):
@@ -766,6 +817,21 @@ def _render_spot_fire_spread():
 
     _render_caregiver_action_box(dlabel, fwi)
 
+    # SVI context ribbon
+    _svi_val = st.session_state.get("spot_svi", svi_auto)
+    if _svi_val is not None:
+        _svi_tier = "High" if _svi_val >= 0.75 else ("Moderate" if _svi_val >= 0.5 else "Low")
+        _svi_clr  = "#FF4B4B" if _svi_val >= 0.75 else ("#d4a017" if _svi_val >= 0.5 else "#3fb950")
+        _svi_loc  = f" — {svi_county}, {svi_state}" if svi_county else ""
+        st.markdown(
+            f"<div style='background:{_svi_clr}18;border-left:3px solid {_svi_clr};"
+            f"padding:8px 14px;border-radius:4px;margin:8px 0;font-size:0.88rem'>"
+            f"<b style='color:{_svi_clr}'>County SVI = {_svi_val:.2f} ({_svi_tier} vulnerability){_svi_loc}</b>"
+            f" &nbsp;·&nbsp; WiDS data: high-SVI counties experience evacuation delays "
+            f"up to <b>11.5 hours longer</b> than low-SVI counties.</div>",
+            unsafe_allow_html=True,
+        )
+
     # -----------------------------------------------------------------------
     # Spread rate summary
     # -----------------------------------------------------------------------
@@ -796,9 +862,117 @@ def _render_spot_fire_spread():
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     # -----------------------------------------------------------------------
-    # Map
+    # 2D Fire Growth Shape — Technical Cross-Section
     # -----------------------------------------------------------------------
-    st.markdown("**Predicted fire perimeters at 1h, 3h, 6h, 12h, 24h**")
+    st.divider()
+    st.subheader("Fire Growth Shape — Technical Cross-Section")
+    st.caption(
+        "Top-down elliptical perimeters in local geographic coordinates. "
+        "Positive X = East, Positive Y = North. Origin = ignition point. "
+        "Shape generated by Van Wagner (1969) ellipse model. "
+        "Aspect ratio locked 1:1 — distortion-free."
+    )
+
+    _theta = radians(wind_to_deg)
+    fig_shape = go.Figure()
+
+    # Draw outermost perimeter first so inner ones render on top
+    for poly in reversed(polygons):
+        _t_min = poly["t_hr"] * 60.0
+        _a = (R_head + R_back) / 2.0 * _t_min       # semi-major (m)
+        _b = max(_a / LW, 1.0)                        # semi-minor (m)
+        _c_off = _a - R_back * _t_min                 # ellipse center offset (downwind)
+
+        _east_pts, _north_pts = [], []
+        for _i in range(91):
+            _angle = 2.0 * pi * _i / 90
+            _x_loc = _b * cos(_angle)
+            _y_loc = _c_off + _a * sin(_angle)
+            _east_pts.append(_x_loc * cos(_theta) + _y_loc * sin(_theta))
+            _north_pts.append(-_x_loc * sin(_theta) + _y_loc * cos(_theta))
+
+        fig_shape.add_trace(go.Scatter(
+            x=_east_pts,
+            y=_north_pts,
+            mode="lines",
+            fill="toself",
+            fillcolor=poly["color"] + "30",
+            line=dict(color=poly["color"], width=2),
+            name=f"{poly['t_hr']}h  —  {poly['area_acres']:,.0f} ac",
+            hovertemplate=(
+                f"<b>{poly['t_hr']}h perimeter</b><br>"
+                "E: %{x:.0f} m<br>N: %{y:.0f} m<extra></extra>"
+            ),
+        ))
+
+    # Ignition point marker
+    fig_shape.add_trace(go.Scatter(
+        x=[0], y=[0],
+        mode="markers+text",
+        marker=dict(size=14, color="#FF0000", symbol="cross"),
+        text=["Ignition"],
+        textposition="top right",
+        textfont=dict(color="#FF6666", size=11),
+        name="Ignition",
+        hovertemplate="<b>Ignition point</b><extra></extra>",
+    ))
+
+    # Spread direction arrow (1h head distance, minimum 100 m for visibility)
+    _arr_len = max(R_head * 60.0, 100.0)
+    _arr_e   = _arr_len * sin(_theta)
+    _arr_n   = _arr_len * cos(_theta)
+    fig_shape.add_annotation(
+        x=_arr_e, y=_arr_n,
+        ax=0, ay=0,
+        xref="x", yref="y", axref="x", ayref="y",
+        arrowhead=4, arrowwidth=3, arrowcolor="#00BFFF",
+        text=f"  Spread {wind_to_deg:.0f}°",
+        font=dict(color="#00BFFF", size=11),
+        showarrow=True,
+    )
+
+    # Cardinal crosshair
+    fig_shape.add_hline(y=0, line_dash="dot", line_color="#2a2a44", line_width=1)
+    fig_shape.add_vline(x=0, line_dash="dot", line_color="#2a2a44", line_width=1)
+
+    fig_shape.update_layout(
+        template="plotly_dark",
+        xaxis=dict(
+            title="East  ←  ●  →  (m from ignition)",
+            scaleanchor="y",
+            scaleratio=1,
+            zeroline=False,
+            gridcolor="#1e2738",
+        ),
+        yaxis=dict(
+            title="North  ↑  (m from ignition)",
+            zeroline=False,
+            gridcolor="#1e2738",
+        ),
+        height=520,
+        margin=dict(l=70, r=20, t=20, b=60),
+        legend=dict(
+            title="Time Horizon",
+            bgcolor="rgba(13,17,23,0.85)",
+            font=dict(color="#e6edf3", size=11),
+            x=1.01, y=0.99, xanchor="left",
+        ),
+        plot_bgcolor="#0d1117",
+        paper_bgcolor="#0d1117",
+    )
+    st.plotly_chart(fig_shape, use_container_width=True)
+    st.caption(
+        f"Head spread: {R_head:.3f} m/min · Backing: {R_back:.3f} m/min · "
+        f"L/W ratio: {LW:.1f}:1 · Spread direction: {wind_to_deg:.0f}° from North. "
+        "Shape is deterministic given inputs — not a stochastic simulation."
+    )
+
+    # -----------------------------------------------------------------------
+    # Map — geographic context
+    # -----------------------------------------------------------------------
+    st.divider()
+    st.subheader("Geographic Fire Perimeters — Map View")
+    st.caption("Same ellipses overlaid on OpenStreetMap for terrain/road context.")
     fig = go.Figure()
 
     # Ellipses — outermost first (so inner ones render on top)

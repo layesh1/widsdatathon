@@ -225,6 +225,75 @@ def init_evacuee_tracker(dispatcher_username: str = "dispatcher"):
 
 # ── Main render ───────────────────────────────────────────────────────────────
 
+@st.cache_data(show_spinner=False)
+def _load_wids_top_fires():
+    """Load top 10 largest fires from WiDS historical CSV with SVI and delay info."""
+    paths = [
+        Path("fire_events_with_svi_and_delays.csv"),
+        Path("01_raw_data/processed/fire_events_with_svi_and_delays.csv"),
+        Path("../01_raw_data/processed/fire_events_with_svi_and_delays.csv"),
+    ]
+    for p in paths:
+        if p.exists():
+            try:
+                cols = ["name", "county_name", "state", "max_acres", "svi_score",
+                        "hours_to_order", "evacuation_occurred", "fire_start"]
+                df = pd.read_csv(p, usecols=cols, low_memory=False)
+                df = df.dropna(subset=["max_acres"])
+                df["max_acres"] = pd.to_numeric(df["max_acres"], errors="coerce")
+                df["svi_score"] = pd.to_numeric(df.get("svi_score"), errors="coerce")
+                df["hours_to_order"] = pd.to_numeric(df.get("hours_to_order"), errors="coerce")
+                top = df.nlargest(10, "max_acres").copy()
+                return top
+            except Exception:
+                pass
+    return None
+
+
+def _render_largest_incidents():
+    """Show top-10 largest WiDS fire incidents with SVI and alert gap columns."""
+    df = _load_wids_top_fires()
+    if df is None or df.empty:
+        st.info(
+            "No incident data available. Ensure "
+            "`01_raw_data/processed/fire_events_with_svi_and_delays.csv` is present, "
+            "or connect to a live data feed."
+        )
+        return
+
+    display = pd.DataFrame({
+        "Incident":   df["name"].fillna("Unnamed"),
+        "Location":   df.apply(
+            lambda r: (
+                f"{r['county_name']}, {r['state']}"
+                if pd.notna(r.get("county_name")) and pd.notna(r.get("state"))
+                else str(r.get("state", "—") or "—")
+            ),
+            axis=1,
+        ),
+        "Acres":      df["max_acres"].apply(lambda v: f"{v:,.0f}" if pd.notna(v) else "—"),
+        "SVI":        df["svi_score"].apply(lambda v: f"{v:.2f}" if pd.notna(v) else "—"),
+        "Alert Gap":  df["hours_to_order"].apply(
+            lambda v: f"{v:.1f} h" if pd.notna(v) else "No evac action"
+        ),
+    })
+
+    st.dataframe(
+        display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Acres":      st.column_config.TextColumn("Acres burned"),
+            "SVI":        st.column_config.TextColumn("Social Vulnerability (0–1)"),
+            "Alert Gap":  st.column_config.TextColumn("Time to evac order"),
+        },
+    )
+    st.caption(
+        "Top 10 fires by max acreage  ·  WiDS 2021–2025  ·  "
+        "Alert Gap = hours from fire start to first evacuation order"
+    )
+
+
 def render_command_dashboard(fire_data, fire_source, fire_label):
     st.title("Command Dashboard")
     st.caption(f"Emergency Worker View  ·  {fire_label}  ·  WiDS 2021–2025 Historical Benchmarks")
@@ -263,7 +332,13 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
     st.divider()
 
-    # ── Tabs ─────────────────────────────────────────────────────────────────
+    # ── Largest Recent Incidents (WiDS historical data) ───────────────────────
+    st.subheader("Largest Active Incidents")
+    st.caption("Top fires by acreage — WiDS 2021–2025 historical record (active incidents require live feed)")
+    _render_largest_incidents()
+
+    st.divider()
+
     tab_map, tab_evacuees, tab_resources = st.tabs([
         "Fire Map", "Evacuee Status Tracker", "Fire Dept Resources"
     ])
