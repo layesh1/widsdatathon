@@ -653,10 +653,12 @@ with st.sidebar:
             ("Why This App?",  "Why official alerts aren't enough"),
         ],
         "Caregiver": [
-            ("My Evacuee",     "Monitor your evacuee's fire status"),
-            ("Send Alert",     "Alert your evacuee to evacuate"),
-            ("Resources",      "Fire department & shelter directory"),
-            ("Why This App?",  "Why proactive alerts matter"),
+            ("My Evacuee",       "Monitor your evacuee's fire status"),
+            ("Fire Alert",       "Proactive fire threat check by address — before official orders"),
+            ("My Persons",       "Register and manage all monitored people"),
+            ("Send Alert",       "Alert your evacuee to evacuate"),
+            ("Resources",        "Fire department & shelter directory"),
+            ("Why This App?",    "Why proactive alerts matter"),
         ],
         "Caregiver/Evacuee": [  # legacy fallback
             ("My Safety",      "Fire status near your location"),
@@ -670,6 +672,9 @@ with st.sidebar:
             ("Equity & Risk",  "Vulnerability analysis"),
             ("Geographic",     "Hotspots, coverage & counties"),
             ("Fire Patterns",  "Temporal & impact analysis"),
+            ("Trends",         "Year-over-year signal gap & fire trends"),
+            ("Predictive",     "ML delay risk model & county predictions"),
+            ("NRI Analysis",   "FEMA National Risk Index compound vulnerability"),
             ("Technical",      "Data quality & IRWIN linkage"),
             ("Fire Predictor", "Fire spread forecast"),
         ],
@@ -1152,6 +1157,14 @@ def _render_page():
         from caregiver_dashboard import render_caregiver_dashboard
         render_caregiver_dashboard(fire_data=fire_data)
 
+    elif page == "Fire Alert":
+        from proactive_alert_page import render_proactive_alert_page
+        render_proactive_alert_page()
+
+    elif page == "My Persons":
+        from monitored_persons_page import render_monitored_persons_page
+        render_monitored_persons_page()
+
     elif page == "Send Alert":
         from caregiver_dashboard import render_caregiver_dashboard
         render_caregiver_dashboard(fire_data=fire_data)
@@ -1245,6 +1258,18 @@ def _render_page():
         with t3:
             from zone_duration_page import render_zone_duration_page
             render_zone_duration_page()
+
+    elif page == "Trends":
+        from trend_analysis_page import render_trend_analysis_page
+        render_trend_analysis_page()
+
+    elif page == "Predictive":
+        from predictive_delay_page import render_predictive_delay_page
+        render_predictive_delay_page()
+
+    elif page == "NRI Analysis":
+        from fema_nri_page import render_fema_nri_page
+        render_fema_nri_page()
 
     elif page == "Fire Predictor":
         from fire_prediction_page import render_fire_prediction_page

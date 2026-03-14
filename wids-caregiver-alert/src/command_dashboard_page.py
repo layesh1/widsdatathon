@@ -16,6 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
 from pathlib import Path
+import requests
 
 # ── Plotly version shim: 5.x uses Scattermapbox/mapbox; 6.x uses Scattermap/map ──
 _HAS_NEW_MAP = hasattr(go, "Scattermap")
@@ -144,6 +145,184 @@ _STATE_CENTERS = {
     "NV": (39.0, -117.0, 6), "FL": (28.0, -83.5, 6),  "GA": (32.5, -83.5, 6),
     "NC": (35.5, -79.5, 6),  "SC": (33.8, -81.0, 6),  "LA": (31.0, -91.5, 6),
 }
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_red_flag_warnings():
+    """Fetch active Red Flag Warnings from NOAA NWS API.
+
+    Returns a DataFrame with columns:
+        zone, headline, onset, expires, lat, lon, description
+    Only features with valid polygon/multipolygon geometry are included;
+    features with null geometry are skipped.
+    """
+    url = "https://api.weather.gov/alerts/active?event=Red%20Flag%20Warning"
+    try:
+        resp = requests.get(url, timeout=15, headers={"User-Agent": "WildFireAlertApp/1.0"})
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return pd.DataFrame(columns=["zone", "headline", "onset", "expires", "lat", "lon", "description"])
+
+    rows = []
+    for feature in data.get("features", []):
+        geometry = feature.get("geometry")
+        props = feature.get("properties", {})
+
+        lat, lon = None, None
+        if geometry is not None:
+            geo_type = geometry.get("type", "")
+            coords = geometry.get("coordinates")
+            try:
+                if geo_type == "Polygon" and coords:
+                    # coords[0] is the outer ring: list of [lon, lat]
+                    ring = coords[0]
+                    lons = [pt[0] for pt in ring]
+                    lats = [pt[1] for pt in ring]
+                    lon = sum(lons) / len(lons)
+                    lat = sum(lats) / len(lats)
+                elif geo_type == "MultiPolygon" and coords:
+                    # Flatten all rings across all polygons
+                    all_lons, all_lats = [], []
+                    for polygon in coords:
+                        for ring in polygon:
+                            all_lons.extend(pt[0] for pt in ring)
+                            all_lats.extend(pt[1] for pt in ring)
+                    if all_lons:
+                        lon = sum(all_lons) / len(all_lons)
+                        lat = sum(all_lats) / len(all_lats)
+            except Exception:
+                pass
+
+        if lat is None or lon is None:
+            continue  # skip features with no usable geometry
+
+        rows.append({
+            "zone":        props.get("areaDesc", "Unknown zone"),
+            "headline":    props.get("headline", ""),
+            "onset":       props.get("onset", ""),
+            "expires":     props.get("expires", ""),
+            "lat":         lat,
+            "lon":         lon,
+            "description": props.get("description", ""),
+        })
+
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_nifc_active_incidents():
+    """Fetch active wildfire incidents from NIFC GeoJSON endpoint.
+
+    Returns a DataFrame with columns:
+        name, state, acres, containment_pct, lat, lon, fire_id
+    """
+    url = (
+        "https://opendata.arcgis.com/datasets/"
+        "5da472c6d27b4b67970acc7b5044c862_0.geojson"
+    )
+    try:
+        resp = requests.get(url, timeout=20, headers={"User-Agent": "WildFireAlertApp/1.0"})
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return pd.DataFrame(columns=["name", "state", "acres", "containment_pct", "lat", "lon", "fire_id"])
+
+    rows = []
+    for feature in data.get("features", []):
+        props = feature.get("properties", {})
+        geometry = feature.get("geometry") or {}
+        coords = geometry.get("coordinates")
+
+        lat, lon = None, None
+        if coords and len(coords) >= 2:
+            lon, lat = coords[0], coords[1]
+
+        # containment may be stored as a datetime string (ContainmentDateTime) in some versions
+        # or as a percentage — handle both gracefully
+        containment_raw = props.get("PercentContained") or props.get("ContainmentDateTime")
+        try:
+            containment_pct = float(containment_raw) if containment_raw is not None else None
+            # If value is suspiciously large it's probably a timestamp epoch — ignore it
+            if containment_pct is not None and containment_pct > 100:
+                containment_pct = None
+        except (TypeError, ValueError):
+            containment_pct = None
+
+        rows.append({
+            "name":            props.get("IncidentName") or props.get("Name", "Unknown"),
+            "state":           props.get("POOState") or props.get("State", ""),
+            "acres":           props.get("DiscoveryAcres") or props.get("GISAcres") or 0,
+            "containment_pct": containment_pct,
+            "lat":             lat,
+            "lon":             lon,
+            "fire_id":         props.get("UniqueFireIdentifier") or props.get("GlobalID", ""),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["acres"] = pd.to_numeric(df["acres"], errors="coerce").fillna(0)
+    df["containment_pct"] = pd.to_numeric(df["containment_pct"], errors="coerce")
+    # Keep only CONUS bounding box + filter rows missing coordinates
+    df = df.dropna(subset=["lat", "lon"])
+    df = df[df["lat"].between(15, 72) & df["lon"].between(-180, -50)]
+    return df.reset_index(drop=True)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def load_shelter_capacity():
+    """Fetch open shelters from FEMA National Shelter System API.
+
+    Returns a DataFrame with columns:
+        name, county, state, lat, lon, capacity, occupancy, pct_full
+    """
+    url = (
+        "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/FeatureServer/0/query"
+        "?where=1%3D1"
+        "&outFields=SHELTER_NAME,COUNTY,STATE,LATITUDE,LONGITUDE,CAPACITY,CURRENT_OCCUPANCY"
+        "&f=json"
+    )
+    try:
+        resp = requests.get(url, timeout=15, headers={"User-Agent": "WildFireAlertApp/1.0"})
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return pd.DataFrame(columns=["name", "county", "state", "lat", "lon",
+                                     "capacity", "occupancy", "pct_full"])
+
+    rows = []
+    for feature in data.get("features", []):
+        attrs = feature.get("attributes", {})
+        try:
+            cap  = float(attrs.get("CAPACITY")  or 0)
+            occ  = float(attrs.get("CURRENT_OCCUPANCY") or 0)
+            pct  = round(occ / cap * 100, 1) if cap > 0 else 0.0
+        except (TypeError, ValueError):
+            cap, occ, pct = 0.0, 0.0, 0.0
+        try:
+            lat = float(attrs.get("LATITUDE")  or 0) or None
+            lon = float(attrs.get("LONGITUDE") or 0) or None
+        except (TypeError, ValueError):
+            lat, lon = None, None
+
+        rows.append({
+            "name":      attrs.get("SHELTER_NAME", "Unknown"),
+            "county":    attrs.get("COUNTY", ""),
+            "state":     attrs.get("STATE", ""),
+            "lat":       lat,
+            "lon":       lon,
+            "capacity":  cap,
+            "occupancy": occ,
+            "pct_full":  pct,
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df = df.dropna(subset=["lat", "lon"])
+    df = df[df["lat"].between(15, 72) & df["lon"].between(-180, -50)]
+    return df.reset_index(drop=True)
 
 
 def _build_hex_data(fire_data, state_filter="All"):
@@ -339,8 +518,8 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
 
     st.divider()
 
-    tab_map, tab_evacuees, tab_resources = st.tabs([
-        "Fire Map", "Evacuee Status Tracker", "Fire Dept Resources"
+    tab_map, tab_nifc, tab_evacuees, tab_resources = st.tabs([
+        "Fire Map", "Live NIFC Incidents", "Evacuee Status Tracker", "Fire Dept Resources"
     ])
 
     # ════════ TAB 1: FIRE MAP ═══════════════════════════════════════════════
@@ -350,6 +529,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
             state_filter = st.selectbox("Filter by State",
                 ["All", "CA", "OR", "WA", "CO", "NM", "AZ", "TX", "MT", "ID", "NV",
                  "FL", "GA", "NC", "SC", "LA"])
+            st.session_state["cmd_state_filter"] = state_filter
         with col_ctrl2:
             svi_threshold = st.slider("Min SVI to highlight", 0.5, 1.0, 0.75, 0.05)
         with col_ctrl3:
@@ -441,13 +621,145 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
             ),
         )
 
+        # ── Red Flag Warning overlay ──────────────────────────────────────────
+        red_flag = load_red_flag_warnings()
+        if not red_flag.empty:
+            # Filter to state if selected
+            if state_filter != "All" and state_filter in _STATE_BOUNDS:
+                lat_min, lat_max, lon_min, lon_max = _STATE_BOUNDS[state_filter]
+                rf_filtered = red_flag[
+                    red_flag["lat"].between(lat_min, lat_max) &
+                    red_flag["lon"].between(lon_min, lon_max)
+                ]
+            else:
+                rf_filtered = red_flag
+
+            if not rf_filtered.empty:
+                hex_fig.add_trace(_scatter_map(
+                    lat=rf_filtered["lat"].tolist(),
+                    lon=rf_filtered["lon"].tolist(),
+                    mode="markers",
+                    marker=dict(
+                        symbol="triangle-up",
+                        size=14,
+                        color="#FF4B4B",
+                        opacity=0.9,
+                    ),
+                    name="Red Flag Warnings",
+                    text=[
+                        f"<b>{row['zone']}</b><br>{row['headline']}<br>Expires: {row['expires']}"
+                        for _, row in rf_filtered.iterrows()
+                    ],
+                    hoverinfo="text",
+                ))
+
         st.plotly_chart(hex_fig, use_container_width=True)
         st.caption(
             f"{len(hex_df):,} fire events  ·  {fire_label} + WiDS 2021–2025 historical data  ·  "
-            f"Blue circles = SVI \u2265 {svi_threshold} counties"
+            f"Blue circles = SVI \u2265 {svi_threshold} counties  ·  "
+            f"Red triangles = active Red Flag Warnings"
         )
 
-    # ════════ TAB 2: EVACUEE STATUS TRACKER ══════════════════════════════════
+        # Red Flag Warning summary
+        if not red_flag.empty:
+            rf_count = len(red_flag)
+            st.metric("Active Red Flag Warnings", rf_count,
+                      help="Source: NOAA NWS — refreshed every 15 minutes")
+            with st.expander("Active Red Flag Warnings", expanded=False):
+                display_rf = red_flag[["zone", "headline", "onset", "expires"]].copy()
+                display_rf.columns = ["Zone / Area", "Headline", "Onset", "Expires"]
+                st.dataframe(display_rf, use_container_width=True, hide_index=True)
+                st.caption("Source: NOAA National Weather Service — api.weather.gov")
+        else:
+            st.caption("No active Red Flag Warnings at this time.")
+
+    # ════════ TAB 2: LIVE NIFC INCIDENTS ════════════════════════════════════
+    with tab_nifc:
+        st.subheader("Live NIFC Active Fire Incidents")
+        st.caption("Source: NIFC National Interagency Fire Center — updated every 10 minutes")
+
+        nifc_df = load_nifc_active_incidents()
+
+        if nifc_df.empty:
+            st.info(
+                "No NIFC incident data available right now. "
+                "The NIFC GeoJSON endpoint may be temporarily unavailable — try again shortly."
+            )
+        else:
+            # KPI metrics
+            n1, n2, n3 = st.columns(3)
+            total_incidents = len(nifc_df)
+            total_acres = nifc_df["acres"].sum()
+            valid_cont = nifc_df["containment_pct"].dropna()
+            avg_cont = valid_cont.mean() if not valid_cont.empty else None
+
+            n1.metric("Active Incidents", f"{total_incidents:,}",
+                      help="Total currently active NIFC-tracked fires")
+            n2.metric("Total Acres",      f"{total_acres:,.0f}",
+                      help="Sum of reported discovery/GIS acres across all incidents")
+            n3.metric("Avg Containment",
+                      f"{avg_cont:.0f}%" if avg_cont is not None else "—",
+                      help="Average containment % for incidents with reported values")
+
+            st.divider()
+
+            # Scatter map of NIFC incidents
+            nifc_map_df = nifc_df.dropna(subset=["lat", "lon"])
+            if not nifc_map_df.empty:
+                nifc_fig = go.Figure(_scatter_map(
+                    lat=nifc_map_df["lat"].tolist(),
+                    lon=nifc_map_df["lon"].tolist(),
+                    mode="markers",
+                    marker=dict(
+                        size=10,
+                        color="#FF8C00",
+                        opacity=0.85,
+                    ),
+                    name="NIFC Incidents",
+                    text=[
+                        f"<b>{row['name']}</b><br>State: {row['state']}<br>"
+                        f"Acres: {row['acres']:,.0f}<br>"
+                        f"Containment: {row['containment_pct']:.0f}%"
+                        if pd.notna(row['containment_pct'])
+                        else f"<b>{row['name']}</b><br>State: {row['state']}<br>Acres: {row['acres']:,.0f}"
+                        for _, row in nifc_map_df.iterrows()
+                    ],
+                    hoverinfo="text",
+                ))
+                nifc_fig.update_layout(
+                    **{_MAP_KEY: dict(
+                        style="carto-darkmatter",
+                        center=dict(lat=39.5, lon=-98.5),
+                        zoom=3,
+                    )},
+                    height=460,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    paper_bgcolor="#0f0f1a",
+                    legend=dict(
+                        bgcolor="rgba(20,20,30,0.85)",
+                        bordercolor="#444",
+                        borderwidth=1,
+                        font=dict(color="#eee"),
+                        x=0, y=1,
+                    ),
+                )
+                st.plotly_chart(nifc_fig, use_container_width=True)
+
+            # Sortable incidents table
+            st.subheader("All Active Incidents")
+            table_df = nifc_df[["name", "state", "acres", "containment_pct", "fire_id"]].copy()
+            table_df.columns = ["Incident Name", "State", "Acres", "Containment %", "Fire ID"]
+            table_df["Acres"] = table_df["Acres"].apply(
+                lambda v: f"{v:,.0f}" if pd.notna(v) else "—"
+            )
+            table_df["Containment %"] = table_df["Containment %"].apply(
+                lambda v: f"{v:.0f}%" if pd.notna(v) else "—"
+            )
+            st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+        st.caption("Source: NIFC National Interagency Fire Center — updated every 10 minutes")
+
+    # ════════ TAB 4: EVACUEE STATUS TRACKER ══════════════════════════════════
     with tab_evacuees:
         st.subheader("Vulnerable Resident Evacuation Status")
         st.markdown(
@@ -468,6 +780,54 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
         k3.metric("Unconfirmed",           unconf,
                   delta="Needs contact" if unconf > 0 else "All confirmed",
                   delta_color="inverse" if unconf > 0 else "normal")
+
+        st.divider()
+
+        # ── Shelter Capacity ─────────────────────────────────────────────────
+        st.subheader("Nearby Shelter Capacity")
+        shelters = load_shelter_capacity()
+        if shelters.empty:
+            st.info(
+                "FEMA shelter data is not available right now. "
+                "The FEMA National Shelter System may not have open shelters in your area, "
+                "or the API is temporarily unavailable."
+            )
+        else:
+            # Filter by state if a state is selected in the Fire Map tab
+            # We read the state from session_state if set, otherwise show all
+            _sel_state = st.session_state.get("cmd_state_filter", "All")
+            if _sel_state and _sel_state != "All" and "state" in shelters.columns:
+                shelters_view = shelters[
+                    shelters["state"].str.upper() == _sel_state.upper()
+                ].copy()
+            else:
+                shelters_view = shelters.copy()
+
+            near_capacity = shelters_view[shelters_view["pct_full"] >= 80]
+            if not near_capacity.empty:
+                st.warning(
+                    f"⚠️ {len(near_capacity)} shelter(s) near capacity (≥ 80% full)"
+                )
+
+            # Table
+            shelt_table = shelters_view[
+                ["name", "county", "state", "capacity", "occupancy", "pct_full"]
+            ].copy()
+            shelt_table.columns = ["Shelter Name", "County", "State", "Capacity", "Occupancy", "% Full"]
+            shelt_table["% Full"] = shelt_table["% Full"].apply(
+                lambda v: f"{v:.0f}%" if pd.notna(v) else "—"
+            )
+            shelt_table["Capacity"]  = shelt_table["Capacity"].apply(
+                lambda v: f"{int(v):,}" if pd.notna(v) and v > 0 else "—"
+            )
+            shelt_table["Occupancy"] = shelt_table["Occupancy"].apply(
+                lambda v: f"{int(v):,}" if pd.notna(v) else "—"
+            )
+            st.dataframe(shelt_table, use_container_width=True, hide_index=True)
+            st.caption(
+                f"Showing {len(shelters_view):,} open shelter(s)  ·  "
+                "Source: FEMA National Shelter System — refreshed every 30 minutes"
+            )
 
         st.divider()
 
@@ -662,7 +1022,7 @@ def render_command_dashboard(fire_data, fire_source, fire_label):
             "when a caregiver confirms their person has evacuated, status updates automatically here."
         )
 
-    # ════════ TAB 3: FIRE DEPT RESOURCES ════════════════════════════════════
+    # ════════ TAB 5: FIRE DEPT RESOURCES ════════════════════════════════════
     with tab_resources:
         st.subheader("Fire Department Resources — USFA National Registry")
 

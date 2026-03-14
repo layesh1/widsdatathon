@@ -14,6 +14,7 @@ to a no-op (logged to stderr only) so the dashboard never crashes.
 
 from __future__ import annotations
 import logging
+import re
 from typing import Optional
 
 log = logging.getLogger(__name__)
@@ -133,3 +134,177 @@ def send_evacuation_alert(
         )
 
     return send_sms_alert(phone, message)
+
+
+# ── Pre-order early warning SMS ───────────────────────────────────────────────
+
+def send_preorder_alert(
+    phone: str,
+    resident_name: str,
+    address: str,
+    estimated_hours: float,
+    wind_mph: float,
+    wind_dir: str,
+    mobility_type: str = "mobile_adult",
+    lang: str = "en",
+) -> bool:
+    """
+    Send a pre-order early warning SMS when a fire is detected nearby but no
+    official evacuation order has yet been issued.
+
+    Parameters
+    ----------
+    phone           : Recipient phone (E.164 or 10-digit US)
+    resident_name   : Resident's first name (used in personalization)
+    address         : Resident's street address / neighborhood
+    estimated_hours : Estimated hours until the fire front reaches the area
+    wind_mph        : Current wind speed in mph
+    wind_dir        : Wind direction string (e.g. "NE", "Southwest")
+    mobility_type   : Used to adjust urgency language (e.g. "no_vehicle", "disabled")
+    lang            : "en" or "es"
+
+    Returns
+    -------
+    True on success, False otherwise.
+    """
+    # Format estimated time as "Xh Ym"
+    total_min = int(round(estimated_hours * 60))
+    hrs = total_min // 60
+    mins = total_min % 60
+    if hrs > 0 and mins > 0:
+        time_str = f"{hrs}h {mins}m"
+    elif hrs > 0:
+        time_str = f"{hrs}h"
+    else:
+        time_str = f"{mins}m"
+
+    # Mobility-specific action line
+    _action_en = {
+        "mobile_adult":      "Begin evacuating NOW.",
+        "elderly":           "Begin evacuating NOW. Call your county special-needs hotline for priority assistance.",
+        "disabled":          "Begin evacuating NOW. Contact paratransit or call 211 for accessible transport.",
+        "no_vehicle":        "Begin evacuating NOW. Call 211 or 911 for emergency transport — do NOT wait.",
+        "medical_equipment": "Begin evacuating NOW. Secure all medical equipment first. Call 911 if transport help is needed.",
+        "caregiver":         "Begin evacuating NOW with your care recipient. Call 911 if transport assistance is needed.",
+    }
+    _action_es = {
+        "mobile_adult":      "Comience a evacuar AHORA.",
+        "elderly":           "Comience a evacuar AHORA. Llame a la línea especial de su condado para asistencia prioritaria.",
+        "disabled":          "Comience a evacuar AHORA. Contacte paratransporte o llame al 211 para transporte accesible.",
+        "no_vehicle":        "Comience a evacuar AHORA. Llame al 211 o al 911 para transporte de emergencia — NO espere.",
+        "medical_equipment": "Comience a evacuar AHORA. Asegure primero todo el equipo médico. Llame al 911 si necesita ayuda.",
+        "caregiver":         "Comience a evacuar AHORA con su receptor de cuidados. Llame al 911 si necesita asistencia.",
+    }
+
+    if lang == "es":
+        action = _action_es.get(mobility_type, _action_es["mobile_adult"])
+        prefix = "URGENTE — " if estimated_hours < 1 else ""
+        message = (
+            f"{prefix}ALERTA PREVIA DE INCENDIO FORESTAL: Se detectó un incendio cerca de {address}. "
+            f"Frente de fuego estimado: {time_str}. "
+            f"Viento {wind_mph:.0f} mph {wind_dir}. "
+            f"Orden oficial aún no emitida (promedio histórico de retraso: 1.1h). "
+            f"Con su nivel de movilidad, {action} "
+            "Llame al 911 si necesita transporte."
+        )
+    else:
+        action = _action_en.get(mobility_type, _action_en["mobile_adult"])
+        prefix = "URGENT — " if estimated_hours < 1 else ""
+        message = (
+            f"{prefix}WILDFIRE PRE-ORDER ALERT: A fire was detected near {address}. "
+            f"Estimated fire front: {time_str}. "
+            f"Wind {wind_mph:.0f} mph {wind_dir}. "
+            f"Official order not yet issued (historical avg: 1.1h delay). "
+            f"With your mobility level, {action} "
+            "Call 911 if you need transport."
+        )
+
+    return send_sms_alert(phone, message)
+
+
+# ── Check-in request SMS ──────────────────────────────────────────────────────
+
+def send_checkin_request(
+    phone: str,
+    resident_name: str,
+    shelter_name: str = "",
+    estimated_travel_min: int = 60,
+    lang: str = "en",
+) -> bool:
+    """
+    Send a check-in request SMS after the estimated travel time has elapsed,
+    asking the resident to confirm safe arrival.
+
+    Parameters
+    ----------
+    phone                : Recipient phone (E.164 or 10-digit US)
+    resident_name        : Resident's first name
+    shelter_name         : Destination shelter (shown as context if provided)
+    estimated_travel_min : Minutes estimated for travel (included in message for context)
+    lang                 : "en" or "es"
+
+    Returns
+    -------
+    True on success, False otherwise.
+    """
+    first_name = resident_name.split()[0] if resident_name else "there"
+
+    if lang == "es":
+        shelter_line = f"Refugio: {shelter_name}. " if shelter_name else ""
+        message = (
+            f"Hola {first_name}, este es su recordatorio de registro por incendio forestal. "
+            f"¿Llegó a un lugar seguro? "
+            f"{shelter_line}"
+            "Responda SI para confirmar. "
+            "Responda AYUDA si necesita asistencia."
+        )
+    else:
+        shelter_line = f"Shelter: {shelter_name}. " if shelter_name else ""
+        message = (
+            f"Hi {first_name}, this is your wildfire check-in. "
+            f"Did you arrive safely? "
+            f"{shelter_line}"
+            "Reply YES to confirm. "
+            "Reply HELP if you need assistance."
+        )
+
+    return send_sms_alert(phone, message)
+
+
+# ── Check-in response handler ─────────────────────────────────────────────────
+
+# Patterns are matched case-insensitively against the full trimmed message body.
+_CONFIRMED_PATTERN = re.compile(
+    r"\b(yes|si|sí|safe|llegue|llegué|ok|okay|bien|aqui|aquí|here|arrived)\b",
+    re.IGNORECASE,
+)
+_NEEDS_HELP_PATTERN = re.compile(
+    r"\b(help|ayuda|no|stuck|atrapado|atrapada|trapped|need help|necesito ayuda|emergency|emergencia)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_checkin_reply(message_body: str) -> str:
+    """
+    Parse a resident's reply to a check-in SMS and return a status string.
+
+    Parameters
+    ----------
+    message_body : Raw text body of the incoming SMS reply
+
+    Returns
+    -------
+    "confirmed"  — resident confirmed safe arrival
+                   (matches: YES, SI, SAFE, LLEGUE, OK, AQUI, ARRIVED, etc.)
+    "needs_help" — resident needs assistance
+                   (matches: HELP, AYUDA, NO, STUCK, ATRAPADO, TRAPPED, etc.)
+    "unknown"    — message could not be classified
+    """
+    text = (message_body or "").strip()
+
+    # Check for help signals first (higher priority if both appear)
+    if _NEEDS_HELP_PATTERN.search(text):
+        return "needs_help"
+    if _CONFIRMED_PATTERN.search(text):
+        return "confirmed"
+    return "unknown"
